@@ -275,7 +275,7 @@ PlaceMentor-AI
 Clone Repository
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/placement.git
+git clone https://github.com/pawanyadav3714/placement.git
 ```
 
 Install Dependencies

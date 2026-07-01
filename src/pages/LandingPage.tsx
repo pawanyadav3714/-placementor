@@ -17,16 +17,16 @@ export default function LandingPage() {
   const navigate = useNavigate();
 
   const [quotas, setQuotas] = useState([
-    { id: 'gemini35flash', name: "Gemini 3.5 Flash", icon: "✦", colorClass: "text-blue-400 text-sm", quota: 98.40 },
-    { id: 'gemini31flashlite', name: "Gemini 3.1 Flash Lite", icon: "✦", colorClass: "text-blue-400 text-sm", quota: 99.10 },
-    { id: 'gemini3flashpreview', name: "Gemini 3 Flash Preview", icon: "✦", colorClass: "text-blue-400 text-sm", quota: 97.20 },
-    { id: 'gemini31propreview', name: "Gemini 3.1 Pro Preview", icon: "✦", colorClass: "text-blue-400 text-sm", quota: 98.40 },
-    { id: 'geminiprolatest', name: "Gemini Pro Latest", icon: "✦", colorClass: "text-blue-400 text-sm", quota: 92.50 },
-    { id: 'geminiflashlatest', name: "Gemini Flash Latest", icon: "✦", colorClass: "text-blue-400 text-sm", quota: 95.20 },
-    { id: 'openai', name: "OpenAI (GPT-4o)", icon: "O", colorClass: "text-green-400 font-bold text-sm", quota: 92.50 },
-    { id: 'groq', name: "Groq (Llama 3)", icon: "G", colorClass: "text-orange-400 font-bold text-sm", quota: 95.20 },
-    { id: 'openrouter', name: "OpenRouter (DeepSeek)", icon: "C", colorClass: "text-gray-300 font-bold text-sm", quota: 64.80 },
-    { id: 'cloudflare', name: "Cloudflare AI", icon: "♨", colorClass: "text-amber-500 font-bold text-sm", quota: 89.90 },
+    { id: 'gemini-3.5-flash', name: "Gemini 3.5 Flash", icon: "✦", colorClass: "text-blue-400 text-sm", quota: 98.40 },
+    { id: 'gemini-3.1-flash-lite', name: "Gemini 3.1 Flash Lite", icon: "✦", colorClass: "text-blue-400 text-sm", quota: 99.10 },
+    { id: 'gemini-3-flash-preview', name: "Gemini 3 Flash Preview", icon: "✦", colorClass: "text-blue-400 text-sm", quota: 97.20 },
+    { id: 'gemini-3.1-pro-preview', name: "Gemini 3.1 Pro Preview", icon: "✦", colorClass: "text-blue-400 text-sm", quota: 98.40 },
+    { id: 'gemini-pro-latest', name: "Gemini Pro Latest", icon: "✦", colorClass: "text-blue-400 text-sm", quota: 92.50 },
+    { id: 'gemini-flash-latest', name: "Gemini Flash Latest", icon: "✦", colorClass: "text-blue-400 text-sm", quota: 95.20 },
+    { id: 'OpenAI', name: "OpenAI (GPT-4o)", icon: "O", colorClass: "text-green-400 font-bold text-sm", quota: 92.50 },
+    { id: 'Groq', name: "Groq (Llama 3)", icon: "G", colorClass: "text-orange-400 font-bold text-sm", quota: 95.20 },
+    { id: 'OpenRouter', name: "OpenRouter (DeepSeek)", icon: "C", colorClass: "text-gray-300 font-bold text-sm", quota: 64.80 },
+    { id: 'Cloudflare', name: "Cloudflare AI", icon: "♨", colorClass: "text-amber-500 font-bold text-sm", quota: 89.90 },
   ]);
 
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
@@ -115,7 +115,26 @@ export default function LandingPage() {
   }, []);
 
   useEffect(() => {
-    // Quotas remain static for now until actual API usage syncing is implemented
+    const fetchQuotas = async () => {
+      try {
+        const res = await fetch('/api/ai-quotas');
+        if (res.ok) {
+          const data = await res.json();
+          setQuotas(prev => prev.map(q => {
+            const serverQuota = data.find((sq: any) => sq.id === q.id);
+            if (serverQuota) {
+              return { ...q, quota: serverQuota.percentage };
+            }
+            return q;
+          }));
+        }
+      } catch (err) {
+        console.warn("Failed to fetch AI quotas:", err);
+      }
+    };
+    fetchQuotas();
+    const interval = setInterval(fetchQuotas, 30000); // refresh every 30s
+    return () => clearInterval(interval);
   }, []);
 
   const handleSearch = (e: React.FormEvent) => {

@@ -1,23 +1,15 @@
 import dotenv from "dotenv";
-import { GoogleGenAI, ThinkingLevel } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 import crypto from "crypto";
-import { getApps, initializeApp } from "firebase-admin/app";
-import { getFirestore, FieldValue } from "firebase-admin/firestore";
 
 dotenv.config();
 
-// Initialize Firebase Admin (safe multiple initialization check)
-if (!getApps().length) {
-  try {
-    // If no service account is provided, this will work if running in GCP
-    // For local dev without service account, it might fail. We'll catch and mock if needed.
-    initializeApp();
-  } catch (error) {
-    console.warn(
-      "Failed to initialize Firebase Admin automatically. Caching will use fallback.",
-    );
-  }
+// In-memory server state
+interface UsageData {
+  [model: string]: number;
 }
+const globalUsage: UsageData = {};
+const memCache: Map<string, { response: string; model: AIProvider }> = new Map();
 
 const geminiAi = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY,
@@ -659,36 +651,16 @@ Here is a conceptual breakdown to deepen your understanding:
 
     // 4. Save to Cache and Track Usage
     await this.saveCache(promptHash, finalResult, finalProvider);
-    await this.trackUsage(userId, feature, finalProvider);
+    await this.trackUsage(userId, feature, (finalProvider === "Gemini" && (this as any)._lastGeminiModelUsed) || finalProvider);
 
     return { text: finalResult, providerUsed: finalProvider, cached: false };
   }
 
-  // In-memory fallback cache
-  private static memCache: Map<
-    string,
-    { response: string; model: AIProvider }
-  > = new Map();
+  private static _lastGeminiModelUsed: string = "";
 
   private static async checkCache(promptHash: string): Promise<string | null> {
-    if (this.memCache.has(promptHash)) {
-      return this.memCache.get(promptHash)!.response;
-    }
-    try {
-      if (getApps().length) {
-        const db = getFirestore();
-        const docSnap = await db
-          .collection("ai_responses")
-          .doc(promptHash)
-          .get();
-        if (docSnap.exists) {
-          return docSnap.data()?.response || null;
-        }
-      }
-    } catch (error: any) {
-      if (!error.message.includes("PERMISSION_DENIED")) {
-        console.warn(`[AIService] Cache read failed: ${error.message}`);
-      }
+    if (memCache.has(promptHash)) {
+      return memCache.get(promptHash)!.response;
     }
     return null;
   }
@@ -698,43 +670,25 @@ Here is a conceptual breakdown to deepen your understanding:
     response: string,
     modelUsed: AIProvider,
   ): Promise<void> {
-    this.memCache.set(promptHash, { response, model: modelUsed });
+    memCache.set(promptHash, { response, model: modelUsed });
+  }
+
+  static async trackUsage(
+    userId: string,
+    featureUsed: AIFeature,
+    modelUsed: string,
+  ): Promise<void> {
     try {
-      if (getApps().length) {
-        const db = getFirestore();
-        await db.collection("ai_responses").doc(promptHash).set({
-          response,
-          modelUsed,
-          createdAt: FieldValue.serverTimestamp(),
-        });
-      }
+      const modelKey = modelUsed || "Unknown";
+      globalUsage[modelKey] = (globalUsage[modelKey] || 0) + 1;
+      console.log(`[AIService] Tracked usage for ${modelKey}. Total: ${globalUsage[modelKey]}`);
     } catch (error: any) {
-      if (!error.message.includes("PERMISSION_DENIED")) {
-        console.warn(`[AIService] Cache write failed: ${error.message}`);
-      }
+      console.error("[AIService] Usage tracking failed:", error);
     }
   }
 
-  private static async trackUsage(
-    userId: string,
-    featureUsed: AIFeature,
-    modelUsed: AIProvider,
-  ): Promise<void> {
-    try {
-      if (getApps().length) {
-        const db = getFirestore();
-        await db.collection("ai_usage").add({
-          userId,
-          featureUsed,
-          modelUsed,
-          timestamp: FieldValue.serverTimestamp(),
-        });
-      }
-    } catch (error: any) {
-      if (!error.message.includes("PERMISSION_DENIED")) {
-        console.warn(`[AIService] Usage tracking failed: ${error.message}`);
-      }
-    }
+  static async getQuotas(): Promise<UsageData> {
+    return globalUsage;
   }
 
   private static async callProvider(
@@ -787,6 +741,7 @@ Here is a conceptual breakdown to deepen your understanding:
                 `[AIService] Attempting Gemini generation with model: ${currentModel}`,
               );
               
+              (this as any)._lastGeminiModelUsed = currentModel;
               const contents: any = options?.image
                 ? {
                     parts: [

@@ -36,6 +36,9 @@ import {
   Mic,
   MicOff,
   X,
+  XCircle,
+  Bug,
+  Info,
   ArrowLeft,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -94,6 +97,8 @@ int* getConcatenation(int* nums, int numsSize, int* returnSize) {
 }`,
 };
 
+import { safeStringify } from "../../utils/safeStringify";
+
 interface DsaWorkspaceProps {
   initialQuestionIndex?: number | null;
   questionsList?: any[];
@@ -125,6 +130,11 @@ export default function DsaWorkspace({
   const [isEditorExpanded, setIsEditorExpanded] = useState(false);
   const [questions, setQuestions] = useState<any[]>(questionsList || []);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(initialQuestionIndex || 0);
+
+  const isBlueTheme = useMemo(() => {
+    const name = sourceName.toLowerCase();
+    return name.includes("dsa") || name.includes("dev questions") || name.includes("company");
+  }, [sourceName]);
   
   // AI Voice Assistant State
   const [isRecording, setIsRecording] = useState(false);
@@ -254,7 +264,7 @@ export default function DsaWorkspace({
       const res = await fetch("/api/problem-assistant", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: safeStringify({
           problemTitle: currentQuestion?.topic || "Challenge",
           problemText: currentQuestion?.text || "",
           studentCode: code,
@@ -305,13 +315,21 @@ export default function DsaWorkspace({
     monaco.editor.defineTheme('blue-theme', {
       base: 'vs-dark',
       inherit: true,
-      rules: [],
+      rules: [
+        { token: 'comment', foreground: '6272a4', fontStyle: 'italic' },
+        { token: 'keyword', foreground: '8be9fd' },
+        { token: 'identifier', foreground: '50fa7b' },
+        { token: 'string', foreground: 'f1fa8c' },
+      ],
       colors: {
-        'editor.background': '#1e293b', // Deep professional blue
-        'editor.lineHighlightBackground': '#2d3748',
-        'editorLineNumber.foreground': '#718096',
-        'editorBracketMatch.background': '#4a5568',
-        'editorBracketMatch.border': '#718096',
+        'editor.background': '#0f172a', // Deep navy professional blue
+        'editor.lineHighlightBackground': '#1e293b',
+        'editorLineNumber.foreground': '#64748b',
+        'editorLineNumber.activeForeground': '#38bdf8',
+        'editorIndentGuide.background': '#334155',
+        'editor.selectionBackground': '#334155',
+        'editorBracketMatch.background': '#38bdf840',
+        'editorBracketMatch.border': '#38bdf8',
       }
     });
   };
@@ -699,7 +717,7 @@ export default function DsaWorkspace({
       const res = await fetch("/api/generate-solution", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: safeStringify({
           problemTitle: currentQuestion.topic || "Coding Challenge",
           problemText: currentQuestion.text || "No description provided.",
           mode: mode,
@@ -781,7 +799,7 @@ export default function DsaWorkspace({
       const res = await fetch("/api/generate-testcases", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: safeStringify({
           problemTitle: currentQuestion.topic || "Coding Challenge",
           problemText: currentQuestion.text || "No description provided.",
         }),
@@ -853,7 +871,7 @@ export default function DsaWorkspace({
       const res = await fetch("/api/execute-code", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: safeStringify({
           languageId: 71,
           sourceCode: btoa(code),
           problemTitle: currentQuestion?.topic || "Coding Challenge",
@@ -892,7 +910,7 @@ export default function DsaWorkspace({
       const res = await fetch("/api/execute-code", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: safeStringify({
           languageId: 71,
           sourceCode: btoa(code),
           problemTitle: currentQuestion?.topic || "Coding Challenge",
@@ -962,7 +980,7 @@ export default function DsaWorkspace({
       const res = await fetch("/api/review-code", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: safeStringify({
           language: language,
           problemTitle: currentQuestion
             ? currentQuestion.topic || currentQuestion.text.slice(0, 50)
@@ -981,9 +999,18 @@ export default function DsaWorkspace({
   };
 
   const WorkspaceContent = (
-    <div className={clsx("flex flex-col w-full", onClose ? "h-[calc(100vh-140px)] bg-[#1e1e1e] rounded-2xl overflow-hidden border border-white/5" : "h-screen")}>
+    <div className={clsx(
+      "flex flex-col w-full transition-colors duration-500", 
+      onClose ? "h-[calc(100vh-140px)] rounded-2xl overflow-hidden border" : "h-screen",
+      isBlueTheme 
+        ? (onClose ? "bg-[#0f172a] border-blue-500/30" : "bg-[#020617]") 
+        : (onClose ? "bg-[#1e1e1e] border-white/5" : "bg-[#0d1117]")
+    )}>
       {/* Top Navbar inside Workspace */}
-      <div className="flex items-center justify-between bg-[#262626] border-b border-[#3e3e42] px-4 py-2 mb-4 rounded-xl">
+      <div className={clsx(
+        "flex items-center justify-between border-b px-4 py-2 mb-4 rounded-xl",
+        isBlueTheme ? "bg-[#1e293b] border-blue-500/20" : "bg-[#262626] border-[#3e3e42]"
+      )}>
         <div className="flex items-center gap-4 text-[#bfbfbf]">
           {onClose && (
             <button
@@ -1118,16 +1145,28 @@ export default function DsaWorkspace({
           <button
             onClick={runCode}
             disabled={isExecuting}
-            className="bg-[#3e3e42] hover:bg-[#4e4e52] text-[#bfbfbf] px-4 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 cursor-pointer"
+            className={clsx(
+              "relative px-5 py-1.5 rounded-lg text-sm font-semibold transition-all duration-300 flex items-center gap-2 overflow-hidden shadow-lg hover:shadow-emerald-500/10 group cursor-pointer",
+              isExecuting ? "bg-[#3e3e42] opacity-70" : "bg-[#2d2d30] hover:bg-[#3d3d40] text-gray-200 border border-white/5 hover:border-emerald-500/30"
+            )}
           >
-            <Play className="w-4 h-4 text-emerald-500 fill-emerald-500" /> Run
+            <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/0 via-emerald-500/5 to-emerald-500/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
+            <Play className={clsx("w-4 h-4 transition-transform group-hover:scale-110", isExecuting ? "animate-pulse" : "text-emerald-500 fill-emerald-500")} />
+            <span>{isExecuting ? "Executing..." : "Run"}</span>
           </button>
+          
           <button
             onClick={submitCode}
             disabled={isExecuting}
-            className="bg-emerald-600/20 text-emerald-500 hover:bg-emerald-600/30 px-4 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 cursor-pointer"
+            className={clsx(
+              "px-5 py-1.5 rounded-lg text-sm font-semibold transition-all duration-300 flex items-center gap-2 shadow-lg group cursor-pointer",
+              isExecuting 
+                ? "bg-gray-800 text-gray-500" 
+                : "bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-500 border border-emerald-500/20 hover:border-emerald-500/40 shadow-emerald-900/10"
+            )}
           >
-            <Check className="w-4 h-4" /> Submit
+            <Check className="w-4 h-4 transition-transform group-hover:scale-110" />
+            <span>Submit</span>
           </button>
         </div>
       </div>
@@ -1701,7 +1740,7 @@ export default function DsaWorkspace({
                     height="100%"
                     width="100%"
                     language={language}
-                    theme={sourceName.includes("DSA and Dev Questions") ? "blue-theme" : "vs-dark"}
+                    theme={isBlueTheme ? "blue-theme" : "vs-dark"}
                     beforeMount={handleEditorBeforeMount}
                     value={code}
                     onChange={(val) => setCode(val || "")}
@@ -1737,88 +1776,176 @@ export default function DsaWorkspace({
               className="flex flex-col relative"
             >
               {/* Action Bar & Output Panel */}
-              <div className="bg-[#1e1e1e] border border-[#3e3e42] rounded-b-xl border-t-0 flex flex-col h-full overflow-hidden">
-                <div className="flex items-center gap-6 px-4 bg-[#282828] border-b border-[#3e3e42] text-xs font-medium shrink-0 h-10">
+              <div className={clsx(
+                "border rounded-b-xl border-t-0 flex flex-col h-full overflow-hidden",
+                isBlueTheme ? "bg-[#0f172a] border-blue-500/20" : "bg-[#1e1e1e] border-[#3e3e42]"
+              )}>
+                <div className={clsx(
+                  "flex items-center gap-6 px-4 border-b text-xs font-medium shrink-0 h-10",
+                  isBlueTheme ? "bg-[#1e293b] border-blue-500/20" : "bg-[#282828] border-[#3e3e42]"
+                )}>
                   <button
                     onClick={() => setActiveTabRight("result")}
-                    className={`flex items-center gap-2 h-full cursor-pointer ${activeTabRight === "result" ? "text-white border-b-2 border-white" : "text-[#8c8c8c] hover:text-[#bfbfbf]"}`}
+                    className={clsx(
+                      "flex items-center gap-2 h-full cursor-pointer transition-all duration-200 relative px-2",
+                      activeTabRight === "result" 
+                        ? "text-white" 
+                        : "text-[#8c8c8c] hover:text-[#bfbfbf]"
+                    )}
                   >
-                    <TerminalSquare className="w-4 h-4 text-emerald-500" /> Test
-                    Result
+                    <TerminalSquare className={clsx(
+                      "w-4 h-4 transition-colors",
+                      activeTabRight === "result" ? "text-emerald-500" : "text-emerald-500/60"
+                    )} /> 
+                    <span>Test Result</span>
+                    {activeTabRight === "result" && (
+                      <motion.div 
+                        layoutId="activeTabRight"
+                        className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"
+                      />
+                    )}
                   </button>
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-4 text-sm font-mono text-[#bfbfbf]">
                   <div>
                     {output && output.error ? (
-                      <div>
+                      <div className="animate-in fade-in slide-in-from-top-2 duration-300">
                         <div className="text-red-500 font-bold text-lg mb-4 flex items-center gap-2">
-                          <AlertCircle className="w-5 h-5" /> Error
+                          <AlertCircle className="w-5 h-5" /> Execution Failed
                         </div>
-                        <div className="bg-red-500/10 text-red-400 p-4 rounded-lg border border-red-500/20 whitespace-pre-wrap mb-4">
+                        <div className="bg-red-500/10 text-red-400 p-4 rounded-xl border border-red-500/20 whitespace-pre-wrap mb-4 font-mono text-xs">
                           {output.error}
                         </div>
                       </div>
                     ) : output ? (
-                      <div>
-                        <div
-                          className={`font-bold text-lg mb-4 ${output.status?.id === 3 ? "text-emerald-500" : "text-red-500"}`}
-                        >
-                          {output.status?.description ||
-                            (output.status?.id === 3 ? "Accepted" : "Error")}
+                      <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                        <div className="flex items-center justify-between mb-6">
+                          <div
+                            className={clsx(
+                              "font-bold text-2xl flex items-center gap-2",
+                              output.status?.id === 3 ? "text-emerald-500" : "text-rose-500"
+                            )}
+                          >
+                            {output.status?.id === 3 ? (
+                              <CheckCircle2 className="w-7 h-7" />
+                            ) : (
+                              <XCircle className="w-7 h-7" />
+                            )}
+                            {output.status?.description ||
+                              (output.status?.id === 3 ? "Accepted" : "Wrong Answer")}
+                          </div>
+                          
+                          <div className="flex gap-3">
+                             <div className="bg-[#1e293b] px-3 py-1 rounded-full border border-blue-500/20 text-[10px] text-blue-400 flex flex-col items-center justify-center min-w-[60px]">
+                               <span className="text-[8px] opacity-50 uppercase tracking-wider">Runtime</span>
+                               <span className="font-bold">{output.time || "0.00"}s</span>
+                             </div>
+                             <div className="bg-[#1e293b] px-3 py-1 rounded-full border border-purple-500/20 text-[10px] text-purple-400 flex flex-col items-center justify-center min-w-[60px]">
+                               <span className="text-[8px] opacity-50 uppercase tracking-wider">Memory</span>
+                               <span className="font-bold">{output.memory ? (parseInt(output.memory)/1024).toFixed(1) : "0.0"}MB</span>
+                             </div>
+                          </div>
                         </div>
 
                         {output.stderr && (
-                          <div className="bg-red-500/10 text-red-400 p-4 rounded-lg border border-red-500/20 whitespace-pre-wrap mb-4">
-                            {(() => {
-                              try {
-                                return atob(output.stderr);
-                              } catch {
-                                return output.stderr;
-                              }
-                            })()}
+                          <div className="mb-6">
+                             <div className="text-xs text-rose-400 font-bold mb-2 flex items-center gap-1">
+                               <Bug className="w-3 h-3" /> Runtime Error Output
+                             </div>
+                             <div className="bg-rose-500/5 text-rose-400 p-4 rounded-xl border border-rose-500/20 whitespace-pre-wrap font-mono text-xs leading-relaxed">
+                              {(() => {
+                                try {
+                                  return atob(output.stderr);
+                                } catch {
+                                  return output.stderr;
+                                }
+                              })()}
+                            </div>
                           </div>
                         )}
 
-                        <div className="bg-[#282828] border border-[#3e3e42] p-3 rounded-lg mb-4 text-[#bfbfbf]">
-                          <div className="text-xs text-[#8c8c8c] mb-1">
-                            Output
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                          <div className="bg-[#0f172a] border border-blue-500/10 p-4 rounded-xl">
+                            <div className="text-[10px] text-blue-400 font-bold uppercase tracking-wider mb-2">
+                              Your Output
+                            </div>
+                            <pre className="text-sm font-mono text-[#bfbfbf] whitespace-pre-wrap break-all">
+                              {(() => {
+                                try {
+                                  return output.stdout
+                                    ? atob(output.stdout)
+                                    : "--";
+                                } catch {
+                                  return output.stdout;
+                                }
+                              })()}
+                            </pre>
                           </div>
-                          <div>
-                            {(() => {
-                              try {
-                                return output.stdout
-                                  ? atob(output.stdout)
-                                  : "--";
-                              } catch {
-                                return output.stdout;
-                              }
-                            })()}
-                          </div>
+
+                          {(output.expectedOutput ||
+                            (currentQuestion?.testCases &&
+                              currentQuestion.testCases[0]?.output)) && (
+                            <div className="bg-[#0f172a] border border-emerald-500/10 p-4 rounded-xl">
+                              <div className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider mb-2">
+                                Expected Output
+                              </div>
+                              <pre className="text-sm font-mono text-[#bfbfbf] whitespace-pre-wrap break-all">
+                                {output.expectedOutput ||
+                                  (currentQuestion.testCases &&
+                                    currentQuestion.testCases[0].output)}
+                              </pre>
+                            </div>
+                          )}
                         </div>
-                        {(output.expectedOutput ||
-                          (currentQuestion?.testCases &&
-                            currentQuestion.testCases[0]?.output)) && (
-                          <div className="bg-[#282828] border border-[#3e3e42] p-3 rounded-lg mb-4 text-[#bfbfbf]">
-                            <div className="text-xs text-[#8c8c8c] mb-1">
-                              Expected
-                            </div>
-                            <div>
-                              {output.expectedOutput ||
-                                (currentQuestion.testCases &&
-                                  currentQuestion.testCases[0].output)}
-                            </div>
+
+                        {output.message && (
+                          <div className="bg-amber-500/5 border border-amber-500/10 p-4 rounded-xl mb-6">
+                             <div className="text-[10px] text-amber-500 font-bold uppercase tracking-wider mb-2 flex items-center gap-1">
+                               <Info className="w-3 h-3" /> Feedback
+                             </div>
+                             <p className="text-sm text-[#bfbfbf] leading-relaxed italic">
+                               "{output.message}"
+                             </p>
                           </div>
                         )}
 
                         {output.aiAnalysis && (
-                          <div className="mt-6 flex flex-col items-end gap-2">
-                            <div className="text-xs px-2 py-1 bg-[#3e3e42] text-[#8c8c8c] rounded-md flex items-center gap-1 w-fit">
-                              <Wand2 className="w-3 h-3" /> Evaluated by{" "}
-                              {output.aiModel || "AI Model"}
+                          <div className="mt-8 flex flex-col gap-3">
+                            <div className="flex items-center justify-between">
+                              <div className="text-xs px-3 py-1 bg-indigo-500/10 text-indigo-400 rounded-full flex items-center gap-1.5 w-fit border border-indigo-500/20 font-bold">
+                                <Wand2 className="w-3.5 h-3.5" /> Deep Analysis
+                              </div>
+                              <div className="text-[9px] text-[#475569] font-medium tracking-widest uppercase">
+                                Verified by {output.aiModel || "AI Agent"}
+                              </div>
                             </div>
-                            <div className="text-[#8c8c8c] text-sm text-right bg-[#282828] border border-[#3e3e42] p-3 rounded-lg w-full">
+                            <div className="text-[#cbd5e1] text-sm bg-gradient-to-br from-[#1e293b] to-[#0f172a] border border-blue-500/10 p-5 rounded-2xl shadow-xl leading-relaxed">
                               {output.aiAnalysis}
+                            </div>
+                          </div>
+                        )}
+
+                        {output.correctCode && (
+                          <div className="mt-6 flex flex-col gap-2">
+                            <div className="text-xs px-2 py-1 bg-emerald-500/10 text-emerald-400 rounded-md flex items-center gap-1 w-fit border border-emerald-500/20">
+                              <CheckCircle2 className="w-3 h-3" /> Correct Solution for Comparison
+                            </div>
+                            <div className="bg-[#0d1117] border border-[#30363d] rounded-xl overflow-hidden">
+                              <div className="flex items-center justify-between px-4 py-2 bg-[#161b22] border-b border-[#30363d]">
+                                <span className="text-[10px] text-[#8b949e] font-mono">OPTIMIZED SOLUTION</span>
+                                <button 
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(output.correctCode);
+                                  }}
+                                  className="text-[10px] text-[#8b949e] hover:text-white transition-colors"
+                                >
+                                  Copy
+                                </button>
+                              </div>
+                              <pre className="p-4 text-xs font-mono text-[#e6edf3] overflow-x-auto leading-relaxed">
+                                {output.correctCode}
+                              </pre>
                             </div>
                           </div>
                         )}

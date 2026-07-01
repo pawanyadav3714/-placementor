@@ -110,6 +110,41 @@ async function generateWithModelFallback(options: {
   throw lastError;
 }
 
+app.get("/api/ai-quotas", async (req, res) => {
+  try {
+    const usage = await AIService.getQuotas();
+    const QUOTA_LIMITS: Record<string, number> = {
+      'gemini-3.5-flash': 1500,
+      'gemini-flash-latest': 1500,
+      'gemini-3.1-flash-lite': 1500,
+      'gemini-3-flash-preview': 1500,
+      'gemini-3.1-pro-preview': 1000,
+      'gemini-pro-latest': 1000,
+      'OpenAI': 500,
+      'Groq': 1000,
+      'OpenRouter': 500,
+      'Cloudflare': 1000,
+    };
+
+    const results = Object.keys(QUOTA_LIMITS).map(model => {
+      const used = usage?.[model] || 0;
+      const limit = QUOTA_LIMITS[model];
+      const percentage = Math.max(0, Math.min(100, ((limit - used) / limit) * 100));
+      return {
+        id: model,
+        used,
+        limit,
+        percentage: parseFloat(percentage.toFixed(2))
+      };
+    });
+
+    res.json(results);
+  } catch (error) {
+    console.error("Error fetching AI quotas:", error);
+    res.status(500).json({ error: "Failed to fetch quotas" });
+  }
+});
+
 // API Route: Generate Test Questions
 app.post("/api/generate-questions", async (req, res) => {
   try {
@@ -241,17 +276,27 @@ app.post("/api/execute-code", async (req, res) => {
       decodedCode = sourceCode;
     }
 
-    const prompt = `Evaluate the following code for the problem "${problemTitle}".
+    const prompt = `Evaluate the following ${languageId} code for the problem "${problemTitle}".
+
 Problem Description:
 ${problemText}
 
 Test Cases:
 ${JSON.stringify(testCases || [])}
 
-Code To Evaluate:
+Code To Evaluate (${languageId}):
 ${decodedCode}
 
-Analyze the code and dry run it against the provided test cases. Check if the code would compile and produce the correct output logic.
+### EVALUATION PROTOCOL:
+1. **Understand Constraints:** Read the problem description and constraints carefully (e.g., "node is not the tail", "array is sorted", "n >= 1").
+2. **Dry Run:** Mentally execute the code line by line with the provided test cases.
+3. **Logic Check:** Does the algorithm solve the problem correctly? Is the time complexity optimal or acceptable?
+4. **Error Detection:** 
+   - Only report "Runtime Error" (11) if the code would legitimately crash under the given constraints (e.g., accessing 'next' on None when 'next' is NOT guaranteed to exist).
+   - Use "Wrong Answer" (4) if the output is incorrect but the code runs.
+   - Use "Accepted" (3) if the logic is correct and passes all test cases.
+5. **Hallucination Check:** Do NOT invent errors that wouldn't happen if the problem constraints are respected.
+
 Output ONLY a JSON configuration matching this interface exactly (do not output markdown codeblocks, only the raw JSON):
 {
   "status": {
@@ -264,8 +309,9 @@ Output ONLY a JSON configuration matching this interface exactly (do not output 
   "stderr": "Base64 encoded string of runtime/compile error if any, otherwise null or empty string",
   "expectedOutput": "The expected output string",
   "compile_output": null,
-  "message": "Any message or feedback",
-  "aiAnalysis": "Brief explanation of the run result"
+  "message": "Detailed feedback on the solution",
+  "aiAnalysis": "A deep analysis of the user's code. Compare their approach with the optimal one. Mention time and space complexity (e.g., 'Your solution is O(N), which is optimal.').",
+  "correctCode": "Provide the complete, optimized, and correct code solution for this problem so the student can compare it with their own."
 }`;
 
     const aiResponse = await AIService.generateWithFallback(
@@ -1874,7 +1920,7 @@ async function startServer() {
 
   wss.on("connection", async (clientWs) => {
     try {
-      const liveModels = ["gemini-3.1-flash-live-preview"];
+      const liveModels = ["gemini-3.1-flash-live-preview", "gemini-3.5-flash"];
       let session;
       let usedModel = "";
 

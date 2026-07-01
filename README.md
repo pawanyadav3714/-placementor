@@ -8,7 +8,7 @@
 <b>Prepare Smarter • Practice Faster • Get Placed Better</b>
 </p>
 
-<img src="./assets/banner.png" alt="PlaceMentor AI Banner" width="100%" />
+<img src="./assets/banner.png" alt="https://placementor-7583.onrender.com" width="100%" />
 
 <p align="center">
 

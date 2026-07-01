@@ -1,0 +1,11 @@
+{
+  "name": "CareerForge AI",
+  "description": "An intelligent placement preparation and career readiness platform with AI-driven tests, mock interviews, and resume analysis.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

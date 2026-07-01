@@ -1,0 +1,84 @@
+src/pages/dsa/CompanyPrep.tsx:170:                <button 
+src/pages/dsa/CompanyWorkspace.tsx:44:        <button 
+src/pages/dsa/CompanyWorkspace.tsx:61:              <button
+src/pages/dsa/CompanyWorkspace.tsx:109:                   <button className="w-full py-2 bg-[#151B2B] hover:bg-indigo-600 text-indigo-400 hover:text-white border border-indigo-500/30 hover:border-indigo-500 rounded-lg font-semibold flex items-center justify-center gap-2 transition-all mt-auto">
+src/pages/dsa/DsaWorkspace.tsx:329:            <button onClick={runCode} disabled={isExecuting} className="bg-[#3e3e42] hover:bg-[#4e4e52] text-[#bfbfbf] px-4 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+src/pages/dsa/DsaWorkspace.tsx:332:            <button onClick={submitCode} disabled={isExecuting} className="bg-emerald-600/20 text-emerald-500 hover:bg-emerald-600/30 px-4 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+src/pages/dsa/DsaWorkspace.tsx:343:             <button onClick={() => setActiveTabLeft('description')} className={`flex items-center gap-2 py-2 ${activeTabLeft === 'description' ? 'text-white border-b-2 border-white' : 'text-[#8c8c8c] hover:text-[#bfbfbf]'}`}>
+src/pages/dsa/DsaWorkspace.tsx:346:             <button onClick={handleSolutionTabClick} className={`flex items-center gap-2 py-2 ${activeTabLeft === 'solutions' ? 'text-white border-b-2 border-white' : 'text-[#8c8c8c] hover:text-[#bfbfbf]'}`}>
+src/pages/dsa/DsaWorkspace.tsx:349:             <button onClick={() => setActiveTabLeft('submissions')} className={`flex items-center gap-2 py-2 ${activeTabLeft === 'submissions' ? 'text-white border-b-2 border-white' : 'text-[#8c8c8c] hover:text-[#bfbfbf]'}`}>
+src/pages/dsa/DsaWorkspace.tsx:398:                                 <button
+src/pages/dsa/DsaWorkspace.tsx:456:                             <button
+src/pages/dsa/DsaWorkspace.tsx:563:                  <button 
+src/pages/dsa/DsaWorkspace.tsx:610:                    <button onClick={() => setActiveTabRight('result')} className={`flex items-center gap-2 h-full ${activeTabRight === 'result' ? 'text-white border-b-2 border-white' : 'text-[#8c8c8c] hover:text-[#bfbfbf]'}`}>
+src/pages/dsa/DsaWorkspace.tsx:679:            <button onClick={() => setAiReview('')} className="absolute top-4 right-4 text-[#8c8c8c] hover:text-white">✕</button>
+src/pages/auth/AdminLogin.tsx:118:              <button 
+src/pages/auth/Register.tsx:127:          <button 
+src/pages/auth/Register.tsx:143:          <button disabled={loading} onClick={() => handleSocialLogin('github')} className="flex items-center justify-center gap-2.5 py-3 bg-[#0969da] hover:bg-[#0052a3] disabled:opacity-50 text-white rounded-lg transition-all active:scale-[0.98] cursor-pointer hover:shadow-lg hover:-translate-y-0.5 font-medium text-sm">
+src/pages/auth/Register.tsx:146:          <button disabled={loading} onClick={() => handleSocialLogin('google')} className="flex items-center justify-center gap-2.5 py-3 bg-[#2D2D2D] border border-white/5 disabled:opacity-50 hover:bg-[#3D3D3D] text-[#D1D5DB] rounded-lg transition-all active:scale-[0.98] cursor-pointer hover:shadow-lg hover:-translate-y-0.5 font-medium text-sm">
+src/pages/auth/Login.tsx:104:          <button 
+src/pages/auth/Login.tsx:120:          <button disabled={loading} onClick={() => handleSocialLogin('github')} className="flex items-center justify-center gap-2.5 py-3 bg-[#0969da] hover:bg-[#0052a3] disabled:opacity-50 text-white rounded-lg transition-all active:scale-[0.98] cursor-pointer hover:shadow-lg hover:-translate-y-0.5 font-medium text-sm">
+src/pages/auth/Login.tsx:123:          <button disabled={loading} onClick={() => handleSocialLogin('google')} className="flex items-center justify-center gap-2.5 py-3 bg-[#2D2D2D] border border-white/5 disabled:opacity-50 hover:bg-[#3D3D3D] text-[#D1D5DB] rounded-lg transition-all active:scale-[0.98] cursor-pointer hover:shadow-lg hover:-translate-y-0.5 font-medium text-sm">
+src/pages/tests/TestWorkspace.tsx:349:                  <button 
+src/pages/tests/TestWorkspace.tsx:439:             <button onClick={handleFinishTest} className="bg-emerald-600 hover:bg-emerald-500 px-6 py-2.5 rounded-xl font-bold transition-all hover:scale-105 shadow-lg shadow-emerald-500/25">
+src/pages/tests/TestWorkspace.tsx:469:               <button onClick={() => setActiveTest(null)} className="bg-white/10 hover:bg-white/20 border border-white/10 px-8 py-3 rounded-xl font-bold transition-colors">
+src/pages/tests/TestWorkspace.tsx:486:                   <button onClick={handleAskAI} disabled={isAskingAI} className="flex items-center gap-2 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-400 px-4 py-2 rounded-xl text-sm font-bold transition-colors border border-indigo-500/30">
+src/pages/tests/TestWorkspace.tsx:502:                  <button
+src/pages/tests/TestWorkspace.tsx:525:                 <button 
+src/pages/tests/TestWorkspace.tsx:534:                   <button 
+src/pages/tests/TestWorkspace.tsx:541:                   <button 
+src/pages/LandingPage.tsx:264:              <button 
+src/pages/LandingPage.tsx:291:                  <button onClick={() => auth.signOut()} className="px-3 py-2 hover:bg-rose-500/10 rounded-lg text-rose-400 hover:text-rose-300 transition-colors flex items-center gap-3 text-left">
+src/pages/LandingPage.tsx:388:              <button 
+src/pages/admin/AdminPlacement.tsx:169:                <button className="w-full py-3 px-4 bg-[#2563EB]/10 hover:bg-[#2563EB] text-[#3B82F6] hover:text-white border border-[#3B82F6]/30 hover:border-[#2563EB] rounded-xl font-semibold flex items-center justify-center gap-2 transition-all duration-300 cursor-pointer">
+src/pages/admin/AdminTestPapers.tsx:395:            <button onClick={handleReleaseTest} className="bg-emerald-600 hover:bg-emerald-500 px-6 py-3 rounded-xl font-bold flex items-center gap-2 transition-transform hover:scale-[1.02] cursor-pointer">
+src/pages/admin/AdminTestPapers.tsx:402:          <button onClick={() => setActiveTab('question_bank')} className={`pb-4 px-4 font-medium transition-colors border-b-2 cursor-pointer ${activeTab === 'question_bank' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-gray-400 hover:text-gray-300'}`}>Test Question Bank</button>
+src/pages/admin/AdminTestPapers.tsx:403:          <button onClick={() => setActiveTab('create_test')} className={`pb-4 px-4 font-medium transition-colors border-b-2 cursor-pointer ${activeTab === 'create_test' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-gray-400 hover:text-gray-300'}`}>Create Test</button>
+src/pages/admin/AdminTestPapers.tsx:404:          <button onClick={() => setActiveTab('released_tests')} className={`pb-4 px-4 font-medium transition-colors border-b-2 cursor-pointer ${activeTab === 'released_tests' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-gray-400 hover:text-gray-300'}`}>Released Tests</button>
+src/pages/admin/AdminTestPapers.tsx:430:                          <button onClick={() => handleAcceptExtracted(q, idx)} className="flex items-center gap-1 text-sm bg-emerald-500 hover:bg-emerald-400 text-white px-3 py-1.5 rounded-lg transition-colors cursor-pointer">
+src/pages/admin/AdminTestPapers.tsx:433:                          <button onClick={() => handleDeclineExtracted(idx)} className="flex items-center gap-1 text-sm bg-red-500/20 hover:bg-red-500/40 text-red-400 px-3 py-1.5 rounded-lg transition-colors cursor-pointer">
+src/pages/admin/AdminTestPapers.tsx:488:                     <button onClick={handleGenerateAIQuestions} disabled={isGeneratingAI} className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-xl font-medium px-4 flex items-center justify-center transition-colors cursor-pointer">
+src/pages/admin/AdminTestPapers.tsx:519:                            <button onClick={() => handleAcceptAIQuestion(q, idx)} className="flex items-center justify-center gap-1 text-sm bg-emerald-500 hover:bg-emerald-400 text-white px-3 py-1.5 rounded-lg transition-colors cursor-pointer">
+src/pages/admin/AdminTestPapers.tsx:522:                            <button onClick={() => handleDeclineAIQuestion(idx)} className="flex items-center justify-center gap-1 text-sm bg-red-500/20 hover:bg-red-500/40 text-red-400 px-3 py-1.5 rounded-lg transition-colors cursor-pointer">
+src/pages/admin/AdminTestPapers.tsx:542:                 <button onClick={generateManualEditor} className="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-3 rounded-xl font-medium flex items-center justify-center gap-2 transition-colors h-[50px] cursor-pointer">
+src/pages/admin/AdminTestPapers.tsx:592:                      <button onClick={handleSaveManualQuestions} className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 transition-transform hover:scale-[1.02] cursor-pointer">
+src/pages/admin/AdminTestPapers.tsx:604:                   <button 
+src/pages/admin/AdminTestPapers.tsx:617:                     <button 
+src/pages/admin/AdminTestPapers.tsx:623:                     <button 
+src/pages/admin/AdminTestPapers.tsx:629:                     <button 
+src/pages/admin/AdminTestPapers.tsx:659:                          <button onClick={(e) => handleDeleteSavedQuestion(q, e)} className="text-gray-500 hover:text-red-400 p-2 shrink-0 self-start transition-colors cursor-pointer" title="Delete from bank">
+src/pages/admin/AdminTestPapers.tsx:798:                          <button onClick={() => handleDeleteTest(test.id)} className="text-gray-500 hover:text-red-400 p-2 transition-colors cursor-pointer" title="Delete Test">
+src/pages/admin/AdminCompanyManagement.tsx:128:        <button 
+src/pages/admin/AdminCompanyManagement.tsx:145:              <button
+src/pages/admin/AdminCompanyManagement.tsx:182:              <button 
+src/pages/admin/AdminCompanyManagement.tsx:213:                  <button 
+src/pages/admin/AdminCompanyManagement.tsx:237:              <button 
+src/pages/admin/AdminCompanyManagement.tsx:257:                  <button 
+src/pages/admin/AdminDashboard.tsx:59:            <button 
+src/pages/admin/AdminQuestions.tsx:136:            <button 
+src/pages/admin/AdminQuestions.tsx:181:                       <button onClick={() => saveToBank(idx)} className="flex-1 bg-emerald-600 hover:bg-emerald-500 py-2 rounded-xl text-sm font-bold transition-colors cursor-pointer">Assign to Bank</button>
+src/pages/admin/AdminQuestions.tsx:182:                       <button onClick={() => setExtractedQuestions(prev => prev.filter((_, i) => i !== idx))} className="bg-red-500/20 text-red-400 hover:bg-red-500/30 p-2 rounded-xl transition-colors cursor-pointer"><X className="w-5 h-5"/></button>
+src/pages/admin/AdminQuestions.tsx:194:            <button 
+src/pages/admin/AdminQuestions.tsx:227:                  <button 
+src/pages/resume/ResumeUpload.tsx:200:                       <button 
+src/pages/resume/ResumeUpload.tsx:216:              <button 
+src/pages/resume/ResumeUpload.tsx:246:                      <button 
+src/pages/resume/ResumeUpload.tsx:270:              <button onClick={() => setActiveTab('file')} className={"flex-1 py-3 text-sm font-medium rounded-lg transition-colors cursor-pointer " + (activeTab === 'file' ? 'bg-[#111827] shadow text-white' : 'text-gray-400 hover:text-white')}>File Upload</button>
+src/pages/resume/ResumeUpload.tsx:271:              <button onClick={() => setActiveTab('text')} className={"flex-1 py-3 text-sm font-medium rounded-lg transition-colors cursor-pointer " + (activeTab === 'text' ? 'bg-[#111827] shadow text-white' : 'text-gray-400 hover:text-white')}>Paste Text</button>
+src/pages/resume/ResumeUpload.tsx:272:              <button onClick={() => setActiveTab('camera')} className={"flex-1 py-3 text-sm font-medium rounded-lg transition-colors cursor-pointer " + (activeTab === 'camera' ? 'bg-[#111827] shadow text-white' : 'text-gray-400 hover:text-white')}>Camera Scan</button>
+src/pages/resume/ResumeUpload.tsx:324:                <button 
+src/pages/resume/ResumeUpload.tsx:340:                <button onClick={() => simulateAnalysis("Mock camera data")} className="bg-indigo-600 hover:bg-indigo-500 px-6 py-3 rounded-xl font-bold transition-colors cursor-pointer">Start Camera Capture</button>
+src/pages/resume/ResumeUpload.tsx:425:                <button onClick={() => setAnalysisResult(null)} className="z-10 bg-white/10 hover:bg-white/20 px-8 py-3 rounded-xl font-bold transition-colors cursor-pointer">
+src/pages/resume/ResumeUpload.tsx:439:                <button onClick={() => setAnalysisResult(null)} className="text-gray-400 hover:text-white flex items-center gap-2 cursor-pointer">
+src/pages/interview/MockInterviewSession.tsx:354:              <button 
+src/pages/interview/MockInterviewSession.tsx:385:              <button 
+src/pages/interview/MockInterviewSession.tsx:417:                     <button onClick={() => deleteLog(log.id)} className="absolute top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-2 text-gray-500 hover:text-rose-400 bg-[#0A0F1E] rounded-full shadow-lg border border-white/5 cursor-pointer" style={{ [log.sender === 'user' ? 'left' : 'right']: '-2.5rem' }}>
+src/pages/interview/MockInterviewSession.tsx:442:                   <button 
+src/pages/interview/MockInterviewSession.tsx:455:                     <button onClick={() => setShowTranscriptModal(false)} className="text-gray-400 hover:text-white cursor-pointer">
+src/pages/interview/MockInterviewSession.tsx:475:                         <button onClick={submitLiveEvaluation} disabled={evalResult === 'loading'} className="bg-emerald-600 hover:bg-emerald-500 px-8 py-3 rounded-xl font-bold text-white disabled:opacity-50 transition-all shadow-lg cursor-pointer">
+src/pages/interview/InterviewHistory.tsx:59:            <button onClick={() => setSelectedInterview(null)} className="text-indigo-400 hover:text-indigo-300 flex items-center gap-1 font-medium cursor-pointer">
+src/pages/interview/InterviewHistory.tsx:98:                          <button 
+src/pages/interview/InterviewHistory.tsx:120:                         <button 
+src/pages/interview/InterviewHistory.tsx:221:                      <button onClick={() => window.print()} className="text-gray-400 hover:text-white flex items-center gap-1.5 text-sm font-medium bg-[#0A0F1E] border border-white/10 px-3 py-1.5 rounded-lg shadow-sm transition-colors cursor-pointer print:hidden">
+src/pages/dashboard/StudentDashboard.tsx:145:            <button 
+src/pages/dashboard/StudentDashboard.tsx:163:                  <button

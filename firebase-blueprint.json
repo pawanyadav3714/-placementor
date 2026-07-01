@@ -1,0 +1,63 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "role": { "type": "string", "enum": ["student", "mentor", "recruiter", "admin"] },
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "photoUrl": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "role", "email"]
+    },
+    "TechnicalAptitude": {
+      "title": "Technical Aptitude Question",
+      "description": "Global technical aptitude MCQs",
+      "type": "object",
+      "properties": {
+        "question": { "type": "string" },
+        "options": { "type": "array", "items": { "type": "string" } },
+        "correctAnswer": { "type": "string" },
+        "explanation": { "type": "string" },
+        "difficulty": { "type": "string" },
+        "topic": { "type": "string" }
+      }
+    },
+    "AptitudeAttempt": {
+      "title": "Aptitude Quiz Attempt",
+      "description": "Student's attempt at a technical aptitude quiz",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "score": { "type": "number" },
+        "totalQuestions": { "type": "number" },
+        "percentage": { "type": "number" }
+      },
+      "required": ["userId", "date", "score"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profiles"
+    },
+    "/company_prep/{companyId}": {
+      "schema": { "$ref": "#/entities/CompanyPrep" },
+      "description": "Company-wise question banks"
+    },
+    "/technical_aptitude/{questionId}": {
+      "schema": { "$ref": "#/entities/TechnicalAptitude" },
+      "description": "Global technical aptitude questions"
+    },
+    "/aptitude_attempts/{attemptId}": {
+      "schema": { "$ref": "#/entities/AptitudeAttempt" },
+      "description": "Student aptitude quiz attempts"
+    }
+  }
+}

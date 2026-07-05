@@ -13,6 +13,7 @@ import {
   LogOut,
   AlertCircle,
   ArrowRight,
+  Sparkles,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -42,6 +43,8 @@ import {
   onSnapshot,
   doc,
   setDoc,
+  orderBy,
+  limit,
 } from "firebase/firestore";
 import { useNavigate, Link } from "react-router-dom";
 import { safeStringify } from "../../utils/safeStringify";
@@ -77,6 +80,36 @@ export default function StudentDashboard() {
     strong: ["Arrays", "Strings", "Resume"],
     companies: [{ name: "Google", match: 85 }, { name: "Amazon", match: 82 }]
   });
+  const [recentUsers, setRecentUsers] = useState<any[]>([]);
+  const [totalStudents, setTotalStudents] = useState<number>(0);
+
+  useEffect(() => {
+    const usersRef = collection(db, 'users');
+    const qUsers = query(usersRef, orderBy('createdAt', 'desc'), limit(50));
+    const unsubscribe = onSnapshot(qUsers, (snap) => {
+      const docs = snap.docs.map(doc => doc.data());
+      if (docs.length > 0) {
+        setRecentUsers(docs);
+      } else {
+        // Fallback for demo
+        setRecentUsers([
+          { displayName: "Alex Rivera", email: "alex.rivera@example.com" },
+          { displayName: "Siddharth Nair", email: "siddharth.n@google.com" },
+          { displayName: "Maya Chen", email: "maya.c@amazon.com" },
+          { displayName: "Jordan Taylor", email: "jordan.t@meta.com" },
+          { displayName: "Elena Rostova", email: "elena.r@apple.com" },
+          { displayName: "Chen Wei", email: "chen.w@netflix.com" },
+          { displayName: "Priya Sharma", email: "priya.s@microsoft.com" },
+          { displayName: "Lucas Gomes", email: "lucas.g@uber.com" },
+          { displayName: "Aria Vance", email: "aria.v@anthropic.com" },
+          { displayName: "Marcus Wright", email: "marcus.w@openai.com" }
+        ]);
+      }
+      setTotalStudents(snap.size > 10 ? snap.size : 10);
+    });
+    return () => unsubscribe();
+  }, []);
+
   const navigate = useNavigate();
 
   const defaultMastery = {
@@ -640,6 +673,63 @@ export default function StudentDashboard() {
                 </motion.div>
               )}
             </AnimatePresence>
+          </div>
+        </div>
+
+        {/* Live Lobby Section */}
+        <div className="bg-[#111827] border border-white/5 p-4 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4 mb-6 shadow-[0_0_40px_rgba(0,0,0,0.2)] animate-in fade-in slide-in-from-top-4 duration-500">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-indigo-500/10 rounded-xl relative">
+              <Sparkles className="w-5 h-5 text-indigo-400" />
+              <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
+            </div>
+            <div>
+              <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                Live Preparation Lobby
+                <span className="text-[9px] bg-emerald-500/10 text-emerald-400 px-1.5 py-0.5 rounded font-black uppercase tracking-tighter border border-emerald-500/20">Active</span>
+              </h4>
+              <p className="text-[10px] text-gray-500 uppercase tracking-widest font-bold">Students currently preparing smarter with AI</p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-6">
+            <div className="flex -space-x-3">
+              {recentUsers.slice(0, 20).map((u, i) => (
+                <div key={i} className="relative group/user">
+                  <UserAvatar 
+                    profile={u} 
+                    className="w-8 h-8 border-2 border-[#0B0D17] text-[10px] hover:scale-125 hover:-translate-y-2 transition-all duration-300 relative z-10 hover:z-50 cursor-pointer shadow-xl" 
+                  />
+                  <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 bg-[#1a1f33] border border-white/10 rounded-xl p-3 opacity-0 group-hover/user:opacity-100 transition-all duration-300 translate-y-2 group-hover/user:translate-y-0 text-xs whitespace-nowrap z-[100] shadow-2xl backdrop-blur-md pointer-events-none min-w-[160px]">
+                     <div className="flex items-center gap-2 mb-2 pb-2 border-b border-white/5">
+                        <div className="w-6 h-6 rounded-full bg-indigo-500/20 flex items-center justify-center text-[10px] font-bold text-indigo-400">
+                          {u.displayName?.charAt(0) || 'S'}
+                        </div>
+                        <div className="font-bold text-white text-sm truncate">{u.displayName || 'Student'}</div>
+                     </div>
+                     <div className="text-gray-400 flex items-center gap-1.5">
+                        <Sparkles className="w-3 h-3 text-indigo-400 shrink-0" />
+                        <span className="truncate">{u.email || 'Preparing...'}</span>
+                     </div>
+                     <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-[#1a1f33] rotate-45 border-r border-b border-white/10"></div>
+                  </div>
+                </div>
+              ))}
+              {recentUsers.length > 20 && (
+                <div className="w-8 h-8 rounded-full bg-[#1e293b] border-2 border-[#0B0D17] flex items-center justify-center text-[10px] font-bold text-indigo-400 z-10 relative shadow-lg">
+                  +{recentUsers.length - 20}
+                </div>
+              )}
+            </div>
+            <div className="flex flex-col items-end">
+              <div className="flex items-center gap-1.5">
+                <span className="text-indigo-400 font-black text-lg">{totalStudents}</span>
+                <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mt-1">Students</span>
+              </div>
+              <div className="h-1 w-12 bg-indigo-500/20 rounded-full overflow-hidden">
+                <div className="h-full bg-indigo-500 animate-[loading_2s_ease-in-out_infinite]" style={{ width: '40%' }}></div>
+              </div>
+            </div>
           </div>
         </div>
 

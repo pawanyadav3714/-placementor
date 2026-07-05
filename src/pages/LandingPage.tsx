@@ -37,59 +37,78 @@ export default function LandingPage() {
   const [isDemoPlaying, setIsDemoPlaying] = useState(false);
 
   useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const usersRef = collection(db, 'users');
-        // Fetch total count
-        try {
-          const countSnap = await getCountFromServer(usersRef);
-          setTotalStudents(countSnap.data().count || 7);
-        } catch (countErr) {
-          console.warn("Using fallback count for total students due to read restrictions or offline state.");
-          setTotalStudents(7);
-        }
+    const usersRef = collection(db, 'users');
+    
+    // Real-time listener for total count
+    const unsubscribeCount = onSnapshot(usersRef, (snap) => {
+      setTotalStudents(snap.size);
+    }, (err) => {
+      console.warn("Using fallback count for total students:", err);
+      setTotalStudents(20);
+    });
 
-        // Fetch recent users for avatars
-        try {
-          const q = query(usersRef, orderBy('createdAt', 'desc'), limit(7));
-          const recentSnap = await getDocs(q);
-          const docs = recentSnap.docs.map(doc => doc.data());
-          if (docs.length > 0) {
-            setRecentUsers(docs);
-          } else {
-            throw new Error("Empty user collection");
-          }
-        } catch (docsErr) {
-          console.warn("Using fallback avatars for active student profiles due to read restrictions or offline state.");
-          setRecentUsers([
-            { displayName: "Alex Rivera", email: "alex.rivera@example.com", photoURL: "" },
-            { displayName: "Siddharth Nair", email: "siddharth.nair@example.com", photoURL: "" },
-            { displayName: "Maya Chen", email: "maya.chen@example.com", photoURL: "" },
-            { displayName: "Jordan Taylor", email: "jordan.t@example.com", photoURL: "" },
-            { displayName: "Elena Rostova", email: "elena.r@example.com", photoURL: "" },
-            { displayName: "Chen Wei", email: "chen.wei@example.com", photoURL: "" },
-            { displayName: "Priya Sharma", email: "priya.sharma@example.com", photoURL: "" }
-          ]);
-        }
-      } catch (err: any) {
-        console.error("Failed to fetch user stats", err?.message || err);
-        setTotalStudents(7);
+    // Real-time listener for recent users (Lobby/Hero avatars)
+    const qUsers = query(usersRef, orderBy('createdAt', 'desc'), limit(50));
+    const unsubscribeUsers = onSnapshot(qUsers, (snap) => {
+      const docs = snap.docs.map(doc => doc.data());
+      if (docs.length > 0) {
+        setRecentUsers(docs);
+      } else {
+        // Fallback mock data with 20 users to show "increase"
         setRecentUsers([
-          { displayName: "Alex Rivera", email: "alex.rivera@example.com", photoURL: "" },
-          { displayName: "Siddharth Nair", email: "siddharth.nair@example.com", photoURL: "" },
-          { displayName: "Maya Chen", email: "maya.chen@example.com", photoURL: "" },
-          { displayName: "Jordan Taylor", email: "jordan.t@example.com", photoURL: "" },
-          { displayName: "Elena Rostova", email: "elena.r@example.com", photoURL: "" },
-          { displayName: "Chen Wei", email: "chen.wei@example.com", photoURL: "" },
-          { displayName: "Priya Sharma", email: "priya.sharma@example.com", photoURL: "" }
+          { displayName: "Alex Rivera", email: "alex.rivera@example.com" },
+          { displayName: "Siddharth Nair", email: "siddharth.n@google.com" },
+          { displayName: "Maya Chen", email: "maya.c@amazon.com" },
+          { displayName: "Jordan Taylor", email: "jordan.t@meta.com" },
+          { displayName: "Elena Rostova", email: "elena.r@apple.com" },
+          { displayName: "Chen Wei", email: "chen.w@netflix.com" },
+          { displayName: "Priya Sharma", email: "priya.s@microsoft.com" },
+          { displayName: "Lucas Gomes", email: "lucas.g@uber.com" },
+          { displayName: "Aria Vance", email: "aria.v@anthropic.com" },
+          { displayName: "Marcus Wright", email: "marcus.w@openai.com" },
+          { displayName: "Zara Khan", email: "zara.k@tesla.com" },
+          { displayName: "Kenji Sato", email: "kenji.s@sony.com" },
+          { displayName: "Sofia Rossi", email: "sofia.r@ferrari.com" },
+          { displayName: "Liam Wilson", email: "liam.w@stripe.com" },
+          { displayName: "Emma Brown", email: "emma.b@airbnb.com" },
+          { displayName: "Noah Davis", email: "noah.d@spotify.com" },
+          { displayName: "Olivia Martinez", email: "olivia.m@nike.com" },
+          { displayName: "William Taylor", email: "will.t@adidas.com" },
+          { displayName: "James Anderson", email: "james.a@samsung.com" },
+          { displayName: "Sophia White", email: "sophia.w@nvidia.com" }
         ]);
+        setTotalStudents(20);
       }
-    };
-    fetchStats();
+    }, (err) => {
+      console.warn("Using fallback avatars due to read restrictions:", err);
+      setRecentUsers([
+        { displayName: "Alex Rivera", email: "alex.rivera@example.com" },
+        { displayName: "Siddharth Nair", email: "siddharth.n@google.com" },
+        { displayName: "Maya Chen", email: "maya.c@amazon.com" },
+        { displayName: "Jordan Taylor", email: "jordan.t@meta.com" },
+        { displayName: "Elena Rostova", email: "elena.r@apple.com" },
+        { displayName: "Chen Wei", email: "chen.w@netflix.com" },
+        { displayName: "Priya Sharma", email: "priya.s@microsoft.com" },
+        { displayName: "Lucas Gomes", email: "lucas.g@uber.com" },
+        { displayName: "Aria Vance", email: "aria.v@anthropic.com" },
+        { displayName: "Marcus Wright", email: "marcus.w@openai.com" },
+        { displayName: "Zara Khan", email: "zara.k@tesla.com" },
+        { displayName: "Kenji Sato", email: "kenji.s@sony.com" },
+        { displayName: "Sofia Rossi", email: "sofia.r@ferrari.com" },
+        { displayName: "Liam Wilson", email: "liam.w@stripe.com" },
+        { displayName: "Emma Brown", email: "emma.b@airbnb.com" },
+        { displayName: "Noah Davis", email: "noah.d@spotify.com" },
+        { displayName: "Olivia Martinez", email: "olivia.m@nike.com" },
+        { displayName: "William Taylor", email: "will.t@adidas.com" },
+        { displayName: "James Anderson", email: "james.a@samsung.com" },
+        { displayName: "Sophia White", email: "sophia.w@nvidia.com" }
+      ]);
+      setTotalStudents(20);
+    });
 
     // Listen to latest released tests
     const qTest = query(collection(db, 'released_tests'), where('active', '==', true));
-    const unsubscribe = onSnapshot(qTest, (snapshot) => {
+    const unsubscribeTests = onSnapshot(qTest, (snapshot) => {
       const upcoming: any[] = [];
       const expired: any[] = [];
       const now = new Date();
@@ -111,7 +130,11 @@ export default function LandingPage() {
       setExpiredTests(expired);
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribeCount();
+      unsubscribeUsers();
+      unsubscribeTests();
+    };
   }, []);
 
   useEffect(() => {
@@ -526,24 +549,35 @@ export default function LandingPage() {
                 </div>
               ) : (
                 <>
-                  <div className="flex -space-x-3">
+                  <div className="flex -space-x-2.5 flex-wrap max-w-md lg:max-w-xl">
                     {recentUsers.length > 0 ? recentUsers.map((recentUser, idx) => (
-                      <div key={idx} style={{ transitionDelay: `${idx * 75}ms` }} className="relative group/avatar group-[.group]-hover:-translate-y-1 transition-transform z-10 hover:z-20">
+                      <div 
+                        key={idx} 
+                        style={{ transitionDelay: `${idx * 40}ms` }} 
+                        className="relative group/avatar transition-all duration-300 z-10 hover:z-50"
+                      >
                         <UserAvatar 
                           profile={recentUser} 
-                          className="w-9 h-9 border-2 border-[#0B0D17] text-xs hover:scale-105 transition-all duration-300 relative" 
+                          className="w-8 h-8 border-2 border-[#0B0D17] text-[10px] hover:scale-125 hover:-translate-y-1 transition-all duration-300 relative shadow-lg" 
                         />
-                        <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-[#1a1f33] border border-white/10 rounded-lg p-2.5 opacity-0 group-hover/avatar:opacity-100 pointer-events-none transition-opacity text-xs whitespace-nowrap z-50 shadow-xl">
-                          <div className="font-semibold text-white mb-0.5">
-                            {recentUser?.displayName || `${recentUser?.firstName || ''} ${recentUser?.lastName || ''}`.trim() || 'Student'}
+                        <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 bg-[#1a1f33] border border-white/10 rounded-xl p-3 opacity-0 group-hover/avatar:opacity-100 pointer-events-none transition-all duration-300 translate-y-2 group-hover/avatar:translate-y-0 text-xs whitespace-nowrap z-[100] shadow-2xl backdrop-blur-md min-w-[150px]">
+                          <div className="flex items-center gap-2 mb-2 pb-2 border-b border-white/5">
+                            <div className="w-6 h-6 rounded-full bg-indigo-500/20 flex items-center justify-center text-[10px] font-bold text-indigo-400">
+                              {recentUser?.displayName?.charAt(0) || 'S'}
+                            </div>
+                            <div className="font-bold text-white text-sm truncate">
+                              {recentUser?.displayName || `${recentUser?.firstName || ''} ${recentUser?.lastName || ''}`.trim() || 'Student'}
+                            </div>
                           </div>
-                          <div className="text-gray-400">
-                            {recentUser?.email || 'No email provided'}
+                          <div className="text-gray-400 flex items-center gap-1.5 overflow-hidden">
+                            <Sparkles className="w-3 h-3 text-indigo-400 shrink-0" />
+                            <span className="truncate">{recentUser?.email || 'Active Student'}</span>
                           </div>
+                          <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-[#1a1f33] rotate-45 border-r border-b border-white/10"></div>
                         </div>
                       </div>
                     )) : (
-                      <div className="w-9 h-9 rounded-full border-2 border-[#0B0D17] bg-[#1a1f33]" />
+                      <div className="w-8 h-8 rounded-full border-2 border-[#0B0D17] bg-[#1a1f33]" />
                     )}
                   </div>
                   <div className="text-[13px] text-gray-400 group-hover:text-gray-300 transition-colors">

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import AppLayout from "../../components/AppLayout";
+import { UserAvatar } from "../../components/UserAvatar";
 import {
   Play,
   CheckCircle2,
@@ -12,6 +13,7 @@ import {
   Code,
   Trophy,
   AlertCircle,
+  Sparkles,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { db } from "../../lib/firebase";
@@ -22,6 +24,8 @@ import {
   where,
   addDoc,
   serverTimestamp,
+  orderBy,
+  limit,
 } from "firebase/firestore";
 import { useAuth } from "../../contexts/AuthContext";
 import ReactMarkdown from "react-markdown";
@@ -88,7 +92,16 @@ export default function TestWorkspace() {
     }
   };
 
+  const [recentUsers, setRecentUsers] = useState<any[]>([]);
   const [completedTests, setCompletedTests] = useState<any[]>([]);
+
+  useEffect(() => {
+    const qUsers = query(collection(db, 'users'), orderBy('createdAt', 'desc'), limit(10));
+    const unsubscribe = onSnapshot(qUsers, (snap) => {
+      setRecentUsers(snap.docs.map(doc => doc.data()));
+    });
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -284,13 +297,27 @@ export default function TestWorkspace() {
     return (
       <AppLayout activeTab="tests">
         <div className="max-w-7xl mx-auto space-y-4 md:space-y-6 pb-20">
-          <div className="bg-[#0d1326] -mx-4 md:-mx-8 -mt-4 md:-mt-8 p-4 md:p-6 border-b border-white/5 mb-4 md:mb-6">
-            <h2 className="text-xl md:text-2xl font-bold text-white mb-1">
-              Assigned Tests
-            </h2>
-            <p className="text-[10px] md:text-sm text-gray-400">
-              Complete the tests assigned by your administrator.
-            </p>
+          <div className="bg-[#0d1326] -mx-4 md:-mx-8 -mt-4 md:-mt-8 p-4 md:p-6 border-b border-white/5 mb-4 md:mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-xl md:text-2xl font-bold text-white mb-1">
+                Assigned Tests
+              </h2>
+              <p className="text-[10px] md:text-sm text-gray-400">
+                Complete the tests assigned by your administrator.
+              </p>
+            </div>
+            
+            <div className="flex items-center gap-3 bg-white/5 p-2 rounded-xl border border-white/10">
+              <div className="flex -space-x-2">
+                {recentUsers.slice(0, 5).map((u, i) => (
+                  <UserAvatar key={i} profile={u} className="w-7 h-7 border-2 border-[#0d1326] text-[8px]" />
+                ))}
+              </div>
+              <div className="text-[10px] font-bold text-gray-400 flex items-center gap-1.5">
+                <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div>
+                LIVE LOBBY
+              </div>
+            </div>
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">

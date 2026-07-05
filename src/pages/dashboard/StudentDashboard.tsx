@@ -700,7 +700,7 @@ export default function StudentDashboard() {
                     profile={u} 
                     className="w-8 h-8 border-2 border-[#0B0D17] text-[10px] hover:scale-125 hover:-translate-y-2 transition-all duration-300 relative z-10 hover:z-50 cursor-pointer shadow-xl" 
                   />
-                  <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 bg-[#1a1f33] border border-white/10 rounded-xl p-3 opacity-0 group-hover/user:opacity-100 transition-all duration-300 translate-y-2 group-hover/user:translate-y-0 text-xs whitespace-nowrap z-[100] shadow-2xl backdrop-blur-md pointer-events-none min-w-[160px]">
+                  <div className="absolute top-full mt-3 left-1/2 -translate-x-1/2 bg-[#1a1f33] border border-white/10 rounded-xl p-3 opacity-0 group-hover/user:opacity-100 transition-all duration-300 -translate-y-2 group-hover/user:translate-y-0 text-xs whitespace-nowrap z-[100] shadow-2xl backdrop-blur-md pointer-events-none min-w-[160px]">
                      <div className="flex items-center gap-2 mb-2 pb-2 border-b border-white/5">
                         <div className="w-6 h-6 rounded-full bg-indigo-500/20 flex items-center justify-center text-[10px] font-bold text-indigo-400">
                           {u.displayName?.charAt(0) || 'S'}
@@ -711,7 +711,7 @@ export default function StudentDashboard() {
                         <Sparkles className="w-3 h-3 text-indigo-400 shrink-0" />
                         <span className="truncate">{u.email || 'Preparing...'}</span>
                      </div>
-                     <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-[#1a1f33] rotate-45 border-r border-b border-white/10"></div>
+                     <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-[#1a1f33] rotate-45 border-l border-t border-white/10"></div>
                   </div>
                 </div>
               ))}

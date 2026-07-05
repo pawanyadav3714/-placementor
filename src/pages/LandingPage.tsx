@@ -560,7 +560,7 @@ export default function LandingPage() {
                           profile={recentUser} 
                           className="w-8 h-8 border-2 border-[#0B0D17] text-[10px] hover:scale-125 hover:-translate-y-1 transition-all duration-300 relative shadow-lg" 
                         />
-                        <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 bg-[#1a1f33] border border-white/10 rounded-xl p-3 opacity-0 group-hover/avatar:opacity-100 pointer-events-none transition-all duration-300 translate-y-2 group-hover/avatar:translate-y-0 text-xs whitespace-nowrap z-[100] shadow-2xl backdrop-blur-md min-w-[150px]">
+                        <div className="absolute top-full mt-3 left-1/2 -translate-x-1/2 bg-[#1a1f33] border border-white/10 rounded-xl p-3 opacity-0 group-hover/avatar:opacity-100 pointer-events-none transition-all duration-300 -translate-y-2 group-hover/avatar:translate-y-0 text-xs whitespace-nowrap z-[100] shadow-2xl backdrop-blur-md min-w-[150px]">
                           <div className="flex items-center gap-2 mb-2 pb-2 border-b border-white/5">
                             <div className="w-6 h-6 rounded-full bg-indigo-500/20 flex items-center justify-center text-[10px] font-bold text-indigo-400">
                               {recentUser?.displayName?.charAt(0) || 'S'}
@@ -573,7 +573,7 @@ export default function LandingPage() {
                             <Sparkles className="w-3 h-3 text-indigo-400 shrink-0" />
                             <span className="truncate">{recentUser?.email || 'Active Student'}</span>
                           </div>
-                          <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-[#1a1f33] rotate-45 border-r border-b border-white/10"></div>
+                          <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-[#1a1f33] rotate-45 border-l border-t border-white/10"></div>
                         </div>
                       </div>
                     )) : (

@@ -11,22 +11,14 @@ interface UsageData {
 const globalUsage: UsageData = {};
 const memCache: Map<string, { response: string; model: AIProvider }> = new Map();
 
-let geminiAiInstance: GoogleGenAI | null = null;
-
-function getGeminiClient(): GoogleGenAI {
-  const apiKey = process.env.GEMINI_API_KEY?.trim();
-  if (!apiKey || apiKey === "MISSING_API_KEY" || apiKey === "") {
-    throw new Error("GEMINI_API_KEY is not configured. Please add your Gemini API key in the Secrets panel (Settings > Secrets).");
+const geminiAi = new GoogleGenAI({
+  apiKey: process.env.GEMINI_API_KEY,
+  httpOptions: {
+    headers: {
+      'User-Agent': 'aistudio-build',
+    }
   }
-  
-  if (!geminiAiInstance) {
-    geminiAiInstance = new GoogleGenAI({
-      apiKey: apiKey,
-      apiVersion: "v1beta"
-    });
-  }
-  return geminiAiInstance;
-}
+});
 
 const rateLimitedModels = new Map<string, number>();
 
@@ -711,7 +703,11 @@ Here is a conceptual breakdown to deepen your understanding:
   ): Promise<string | null> {
     switch (provider) {
       case "Gemini":
-        const geminiClient = getGeminiClient();
+        if (
+          !process.env.GEMINI_API_KEY ||
+          process.env.GEMINI_API_KEY === "MISSING_API_KEY"
+        )
+          throw new Error("No GEMINI_API_KEY");
 
         let modelName = "gemini-3.5-flash";
         if (
@@ -755,7 +751,7 @@ Here is a conceptual breakdown to deepen your understanding:
                   }
                 : prompt;
 
-              const response = await geminiClient.models.generateContent({
+              const response = await geminiAi.models.generateContent({
                 model: currentModel,
                 contents: contents,
                 config,

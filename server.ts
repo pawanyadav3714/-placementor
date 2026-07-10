@@ -14,14 +14,22 @@ const PORT = 3000;
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
-  httpOptions: {
-    headers: {
-      'User-Agent': 'aistudio-build',
-    }
+let aiClient: GoogleGenAI | null = null;
+
+function getAI(): GoogleGenAI {
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
+  if (!apiKey || apiKey === "MISSING_API_KEY" || apiKey === "") {
+    throw new Error("GEMINI_API_KEY is not configured. Please add your Gemini API key in the Secrets panel (Settings > Secrets).");
   }
-});
+  
+  if (!aiClient) {
+    aiClient = new GoogleGenAI({
+      apiKey: apiKey,
+      apiVersion: "v1beta"
+    });
+  }
+  return aiClient;
+}
 
 const rateLimitedModels = new Map<string, number>();
 
@@ -65,7 +73,7 @@ async function generateWithModelFallback(options: {
     while (retries > 0) {
       try {
         console.log(`[Gemini] Attempting generation with model: ${model}`);
-        const response = await ai.models.generateContent({
+        const response = await getAI().models.generateContent({
           model: model,
           contents: options.contents,
           config: options.config,
@@ -1926,7 +1934,7 @@ async function startServer() {
 
       for (const model of liveModels) {
         try {
-          session = await ai.live.connect({
+          session = await getAI().live.connect({
             model: model,
             config: {
               responseModalities: [Modality.AUDIO],

@@ -31,7 +31,12 @@ function getAI(): GoogleGenAI {
   if (!aiClient) {
     aiClient = new GoogleGenAI({
       apiKey: apiKey,
-      apiVersion: "v1beta"
+      apiVersion: "v1beta",
+      httpOptions: {
+        headers: {
+          "User-Agent": "aistudio-build",
+        },
+      },
     });
   }
   return aiClient;
@@ -43,11 +48,8 @@ function getOrderedModels(primaryModel: string): string[] {
   const allModels = [
     primaryModel,
     "gemini-3.5-flash",
-    "gemini-flash-latest",
     "gemini-3.1-pro-preview",
     "gemini-3.1-flash-lite",
-    "gemini-2.0-flash",
-    "gemini-pro-latest",
   ];
 
   const uniqueModels = Array.from(new Set(allModels));
@@ -90,6 +92,11 @@ async function generateWithModelFallback(options: {
       } catch (err: any) {
         const errMsg = err?.message || String(err);
         const status = err?.status || err?.error?.code;
+
+        if (errMsg.includes("API key not valid") || errMsg.includes("API_KEY_INVALID")) {
+          throw new Error("Your Gemini API key is invalid. Please check your GEMINI_API_KEY in the Secrets panel (Settings > Secrets). Make sure it is copied correctly and has no leading/trailing spaces.");
+        }
+
         const isQuota = status === 429 || errMsg.includes("quota") || errMsg.includes("rate limit") || errMsg.includes("429") || errMsg.includes("RESOURCE_EXHAUSTED");
         const isUnavailable = status === 503 || errMsg.includes("503") || errMsg.includes("UNAVAILABLE") || errMsg.includes("overloaded");
 
@@ -1960,10 +1967,19 @@ async function startServer() {
   const wss = new WebSocketServer({ server, path: "/api/live-interview" });
 
   wss.on("connection", async (clientWs) => {
+    console.log("[WebSocket] Client connected to live-interview");
     try {
-      const liveModels = ["gemini-3.1-flash-live-preview", "gemini-2.0-flash", "gemini-1.5-flash"];
+      const liveModels = ["gemini-3.1-flash-live-preview"];
       let session: any;
       let usedModel = "";
+
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        console.error("[WebSocket] GEMINI_API_KEY not found in environment");
+        clientWs.send(JSON.stringify({ error: "GEMINI_API_KEY not found in environment. Please add it in Settings > Secrets." }));
+        clientWs.close();
+        return;
+      }
 
       for (const model of liveModels) {
         try {
@@ -2031,7 +2047,13 @@ async function startServer() {
           usedModel = model;
           break; // Connected successfully
         } catch (err: any) {
-          console.warn(`Model ${model} failed for Live API:`, err.message);
+          const errMsg = err?.message || String(err);
+          console.warn(`Model ${model} failed for Live API:`, errMsg);
+          if (errMsg.includes("API key not valid") || errMsg.includes("API_KEY_INVALID")) {
+            clientWs.send(JSON.stringify({ error: "Your Gemini API key is invalid. Please check your GEMINI_API_KEY in Settings > Secrets." }));
+            clientWs.close();
+            return;
+          }
         }
       }
 

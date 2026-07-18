@@ -22,7 +22,12 @@ function getGeminiClient(): GoogleGenAI {
   if (!geminiAiInstance) {
     geminiAiInstance = new GoogleGenAI({
       apiKey: apiKey,
-      apiVersion: "v1beta"
+      apiVersion: "v1beta",
+      httpOptions: {
+        headers: {
+          "User-Agent": "aistudio-build",
+        },
+      },
     });
   }
   return geminiAiInstance;
@@ -34,11 +39,8 @@ function getOrderedModels(primaryModel: string): string[] {
   const allModels = [
     primaryModel,
     "gemini-3.5-flash",
-    "gemini-flash-latest",
     "gemini-3.1-pro-preview",
     "gemini-3.1-flash-lite",
-    "gemini-2.0-flash",
-    "gemini-pro-latest",
   ];
 
   const uniqueModels = Array.from(new Set(allModels));
@@ -766,6 +768,11 @@ Here is a conceptual breakdown to deepen your understanding:
             } catch (e: any) {
               const errorMsg = e?.message || String(e);
               const status = e?.status || e?.error?.code;
+              
+              if (errorMsg.includes("API key not valid") || errorMsg.includes("API_KEY_INVALID")) {
+                throw new Error("Your Gemini API key is invalid. Please check your GEMINI_API_KEY in the Secrets panel (Settings > Secrets). Make sure it is copied correctly and has no leading/trailing spaces.");
+              }
+
               const isQuota = status === 429 || errorMsg.includes("quota") || errorMsg.includes("rate limit") || errorMsg.includes("429") || errorMsg.includes("RESOURCE_EXHAUSTED");
               const isUnavailable = status === 503 || errorMsg.includes("503") || errorMsg.includes("UNAVAILABLE") || errorMsg.includes("overloaded");
 

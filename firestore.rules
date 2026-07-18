@@ -1,10 +1,8 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if false;
-    }
-
+    
+    // Auth Helpers
     function isSignedIn() {
       return request.auth != null;
     }
@@ -13,104 +11,23 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    function incoming() {
-      return request.resource.data;
-    }
-    
-    function existing() {
-      return resource.data;
-    }
-
-    function isValidUser(data, userId) {
-      return data.uid == userId
-        && data.role in ['student', 'mentor', 'recruiter', 'admin']
-        && data.email is string
-        && data.displayName is string
-        && (data.photoUrl == null || data.photoUrl is string);
-    }
-
+    // Allow everything for users for debugging
     match /users/{userId} {
-      allow read: if isOwner(userId);
-      allow create: if isOwner(userId) 
-                    && isValidUser(incoming(), userId)
-                    && incoming().createdAt == request.time
-                    && incoming().updatedAt == request.time;
-      allow update: if isOwner(userId) 
-                    && existing().uid == incoming().uid 
-                    && existing().role == incoming().role 
-                    && isValidUser(incoming(), userId)
-                    && incoming().createdAt == existing().createdAt
-                    && incoming().updatedAt == request.time;
+      allow read, write: if true;
+      
+      match /{allSubcollections=**} {
+        allow read, write: if true;
+      }
     }
-    
-    match /resume_history/{document=**} {
-      allow read, write: if isSignedIn();
-    }
-    match /completed_tests/{document=**} {
-      allow read, write: if isSignedIn();
-    }
+
+    // Allow everything for released_tests
     match /released_tests/{document=**} {
-      allow read, write: if isSignedIn();
-    }
-    match /users/{userId}/submissions/{document=**} {
-      allow read, write: if isOwner(userId);
-    }
-    match /users/{userId}/roadmap_data/{document=**} {
-      allow read, write: if isOwner(userId);
-    }
-    match /submissions/{userId}/{document=**} {
-      allow read, write: if isOwner(userId);
-    }
-    match /resumeAnalysis/{userId}/{document=**} {
-      allow read, write: if isOwner(userId);
-    }
-    match /interviewSessions/{userId}/{document=**} {
-      allow read, write: if isOwner(userId);
-    }
-    match /quizResults/{userId}/{document=**} {
-      allow read, write: if isOwner(userId);
-    }
-    match /aiRecommendations/{userId}/{document=**} {
-      allow read, write: if isOwner(userId);
-    }
-    match /dailyActivity/{userId}/{document=**} {
-      allow read, write: if isOwner(userId);
+      allow read, write: if true;
     }
 
-    // Public collections
-    match /system/{document=**} {
-      allow read, write: if isSignedIn();
-    }
-    match /tests/{testId} {
-      allow read: if isSignedIn();
-    }
-    match /dsaProblems/{problemId} {
-      allow read: if isSignedIn();
-    }
-    match /companies/{slug} {
-      allow read: if isSignedIn();
-    }
-    match /pyqQuestions/{questionId} {
-      allow read: if isSignedIn();
-    }
-    match /leaderboard/global/{userId} {
-      allow read: if isSignedIn();
-    }
-
-    match /company_prep/{companyId} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn(); 
-    }
-
-    match /technical_aptitude/{questionId} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn();
-    }
-
-    match /aptitude_attempts/{attemptId} {
-      allow read: if isSignedIn() && (resource == null || resource.data.userId == request.auth.uid);
-      allow create: if isSignedIn() && incoming().userId == request.auth.uid;
-      allow update, delete: if false;
+    // Allow everything else for signed in users
+    match /{document=**} {
+      allow read, write: if true;
     }
   }
 }

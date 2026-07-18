@@ -128,6 +128,10 @@ export default function LandingPage() {
       });
       setUpcomingTests(upcoming);
       setExpiredTests(expired);
+    }, (err) => {
+      console.warn("Using fallback tests due to read restrictions:", err);
+      setUpcomingTests([]);
+      setExpiredTests([]);
     });
 
     return () => {

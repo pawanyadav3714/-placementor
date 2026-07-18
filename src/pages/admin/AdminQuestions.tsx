@@ -87,6 +87,8 @@ export default function AdminQuestions() {
           'company pyqs': data['company pyqs'] || []
         });
       }
+    }, (err) => {
+      console.error("Error fetching question banks:", err);
     });
     return () => unsubscribe();
   }, []);

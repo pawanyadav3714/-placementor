@@ -57,6 +57,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             setProfile(null); // needs onboarding
           }
           setLoading(false);
+        }, (err) => {
+          console.error("AuthContext: Profile snapshot error", err);
+          setLoading(false);
         });
       } else {
         if (unsubscribeProfile) unsubscribeProfile();

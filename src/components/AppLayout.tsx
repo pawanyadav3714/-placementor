@@ -44,6 +44,9 @@ export default function AppLayout({
       setReleasedTests(
         snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
       );
+    }, (err) => {
+      console.warn("AppLayout: Read error for released tests", err);
+      setReleasedTests([]);
     });
     return () => unsubscribe();
   }, [role]);

@@ -103,6 +103,8 @@ export default function TestWorkspace() {
         tests.push({ id: doc.id, ...doc.data() });
       });
       setAssignedTests(tests);
+    }, (err) => {
+      console.error("Error fetching released tests:", err);
     });
 
     // Get completed tests for this user
@@ -116,6 +118,8 @@ export default function TestWorkspace() {
         comp.push({ id: doc.id, ...doc.data() });
       });
       setCompletedTests(comp);
+    }, (err) => {
+      console.error("Error fetching completed tests:", err);
     });
 
     return () => {

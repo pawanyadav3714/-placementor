@@ -11,17 +11,31 @@ dotenv.config();
 const app = express();
 const PORT = 3000;
 
+// Logging middleware
+app.use((req, res, next) => {
+  console.log(`[Server] ${new Date().toISOString()} - ${req.method} ${req.url}`);
+  next();
+});
+
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
-  httpOptions: {
-    headers: {
-      'User-Agent': 'aistudio-build',
-    }
+let aiClient: GoogleGenAI | null = null;
+
+function getAI(): GoogleGenAI {
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
+  if (!apiKey || apiKey === "MISSING_API_KEY" || apiKey === "") {
+    throw new Error("GEMINI_API_KEY is not configured. Please add your Gemini API key in the Secrets panel (Settings > Secrets).");
   }
-});
+  
+  if (!aiClient) {
+    aiClient = new GoogleGenAI({
+      apiKey: apiKey,
+      apiVersion: "v1beta"
+    });
+  }
+  return aiClient;
+}
 
 const rateLimitedModels = new Map<string, number>();
 
@@ -30,8 +44,10 @@ function getOrderedModels(primaryModel: string): string[] {
     primaryModel,
     "gemini-3.5-flash",
     "gemini-flash-latest",
-    "gemini-3.1-flash-lite",
     "gemini-3.1-pro-preview",
+    "gemini-3.1-flash-lite",
+    "gemini-2.0-flash",
+    "gemini-pro-latest",
   ];
 
   const uniqueModels = Array.from(new Set(allModels));
@@ -61,11 +77,11 @@ async function generateWithModelFallback(options: {
 
   let lastError: any = null;
   for (const model of orderedModels) {
-    let retries = 2;
+    let retries = 3;
     while (retries > 0) {
       try {
         console.log(`[Gemini] Attempting generation with model: ${model}`);
-        const response = await ai.models.generateContent({
+        const response = await getAI().models.generateContent({
           model: model,
           contents: options.contents,
           config: options.config,
@@ -74,9 +90,13 @@ async function generateWithModelFallback(options: {
       } catch (err: any) {
         const errMsg = err?.message || String(err);
         const status = err?.status || err?.error?.code;
-        const isQuota = status === 429 || errMsg.includes("quota") || errMsg.includes("rate limit") || errMsg.includes("429");
+        const isQuota = status === 429 || errMsg.includes("quota") || errMsg.includes("rate limit") || errMsg.includes("429") || errMsg.includes("RESOURCE_EXHAUSTED");
+        const isUnavailable = status === 503 || errMsg.includes("503") || errMsg.includes("UNAVAILABLE") || errMsg.includes("overloaded");
+
         if (isQuota) {
           console.log(`[Gemini] Model ${model} rate limit or quota exceeded, trying next model.`);
+        } else if (isUnavailable) {
+          console.warn(`[Gemini] Model ${model} temporary unavailable (503), retrying...`);
         } else {
           console.warn(`[Gemini] Model ${model} failed (status: ${status}):`, errMsg);
         }
@@ -84,22 +104,21 @@ async function generateWithModelFallback(options: {
 
         // If rate limited or quota exceeded (429)
         if (isQuota) {
-          rateLimitedModels.set(model, Date.now() + 10 * 60 * 1000); // penalize for 10 minutes
+          rateLimitedModels.set(model, Date.now() + 5 * 60 * 1000); // penalize for 5 minutes
           break; // instantly try next model
         }
 
         // If 503 temporary unavailable
-        if (
-          status === 503 ||
-          errMsg.includes("503") ||
-          errMsg.includes("UNAVAILABLE")
-        ) {
+        if (isUnavailable) {
           retries--;
           if (retries > 0) {
-            console.log(`[Gemini] Model ${model} received 503, retrying in 1.5s...`);
-            await new Promise((resolve) => setTimeout(resolve, 1500));
+            const delay = (3 - retries) * 1000; // 1s, 2s...
+            console.log(`[Gemini] Model ${model} received 503, retrying in ${delay}ms...`);
+            await new Promise((resolve) => setTimeout(resolve, delay));
             continue;
           }
+          // If all retries failed for this model, penalize it briefly and try next
+          rateLimitedModels.set(model, Date.now() + 30 * 1000); // penalize for 30 seconds
         }
 
         // For other errors, move to next model
@@ -1382,7 +1401,7 @@ Produce a JSON array of questions matching the required schema. Ensure the compa
       if (documentText) {
         const fullPrompt = `${prompt}\n\nHere is the extracted document text:\n${documentText}`;
         response = await generateWithModelFallback({
-          primaryModel: "gemini-3.5-flash",
+          primaryModel: "gemini-1.5-flash",
           contents: [{ text: fullPrompt }],
           config: {
             responseMimeType: "application/json",
@@ -1392,7 +1411,7 @@ Produce a JSON array of questions matching the required schema. Ensure the compa
       } else {
         const base64Clean = imageBase64.split(",")[1] || imageBase64;
         response = await generateWithModelFallback({
-          primaryModel: "gemini-3.5-flash",
+          primaryModel: "gemini-1.5-flash",
           contents: [
             { text: prompt },
             {
@@ -1587,7 +1606,7 @@ Please complete and generate the following fields:
 Output your response strictly as a JSON object with these fields.`;
 
       const response = await generateWithModelFallback({
-        primaryModel: "gemini-3.1-pro-preview",
+        primaryModel: "gemini-1.5-pro",
         contents: [{ text: prompt }],
         config: {
           responseMimeType: "application/json",
@@ -1898,6 +1917,14 @@ Do not return markdown.`;
 
 // Vite Middleware for Dev & Prod
 async function startServer() {
+  // API 404 Handler - Catch-all for undefined /api routes
+  app.all("/api/*", (req, res) => {
+    res.status(404).json({
+      error: "Not Found",
+      message: `API route ${req.method} ${req.url} not found`,
+    });
+  });
+
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true },
@@ -1916,87 +1943,87 @@ async function startServer() {
     console.log("Server running on port " + PORT);
   });
 
+  // Global Error Handler - Ensure JSON response even for internal errors
+  app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    console.error("[Global Error Handler] Caught:", err);
+    // Prevent HTML response for API routes
+    if (req.url.startsWith("/api/")) {
+      return res.status(err.status || 500).json({
+        error: "Internal Server Error",
+        message: String(err.message || err),
+        path: req.url
+      });
+    }
+    next(err);
+  });
+
   const wss = new WebSocketServer({ server, path: "/api/live-interview" });
 
   wss.on("connection", async (clientWs) => {
     try {
-      const liveModels = ["gemini-3.1-flash-live-preview", "gemini-3.5-flash"];
-      let session;
+      const liveModels = ["gemini-3.1-flash-live-preview", "gemini-2.0-flash", "gemini-1.5-flash"];
+      let session: any;
       let usedModel = "";
 
       for (const model of liveModels) {
         try {
-          session = await ai.live.connect({
+          session = await getAI().live.connect({
             model: model,
             config: {
               responseModalities: [Modality.AUDIO],
               inputAudioTranscription: {},
               outputAudioTranscription: {},
+              temperature: 0.7,
+              topP: 0.95,
               speechConfig: {
                 voiceConfig: { prebuiltVoiceConfig: { voiceName: "Zephyr" } },
               },
               systemInstruction:
-                "You are an AI Interviewer conducting a mock interview with a candidate for a technical role. Ask clear questions, evaluate their answers, and remain professional. Provide concise, constructive feedback during the conversation when applicable. Keep your turns relatively brief in a conversational style.",
+                "You are an AI Interviewer conducting a mock interview. Your goal is to be conversational and responsive. Respond extremely quickly and concisely (1-3 sentences max). IMPORTANT: If the user interrupts you while you are speaking, stop immediately and listen to their query. Be attentive and adapt to their flow. You should be able to listen to a single long response for up to 5 minutes if necessary, but when they finish, respond instantly.",
             },
             callbacks: {
               onmessage: (message: LiveServerMessage) => {
-                const parts = message.serverContent?.modelTurn?.parts;
-                if (parts) {
-                  for (const part of parts) {
-                    if (part.inlineData && part.inlineData.data) {
-                      clientWs.send(
-                        JSON.stringify({ audio: part.inlineData.data }),
-                      );
+                const serverContent = message.serverContent;
+                if (!serverContent) return;
+
+                const modelTurn = serverContent.modelTurn;
+                if (modelTurn?.parts) {
+                  for (const part of modelTurn.parts) {
+                    if (part.inlineData?.data) {
+                      clientWs.send(JSON.stringify({ audio: part.inlineData.data }));
                     }
                     if (part.text) {
-                      clientWs.send(
-                        JSON.stringify({ text: part.text, isModel: true }),
-                      );
+                      clientWs.send(JSON.stringify({ text: part.text, isModel: true }));
                     }
                   }
                 }
 
-                if (message.serverContent?.interrupted) {
+                if (serverContent.interrupted) {
+                  console.log("[Live API] Interruption detected by model");
                   clientWs.send(JSON.stringify({ interrupted: true }));
                 }
 
-                if (message.serverContent?.outputTranscription?.text) {
-                  clientWs.send(
-                    JSON.stringify({
-                      text: message.serverContent.outputTranscription.text,
-                      isModel: true,
-                    }),
-                  );
-                }
-                if (message.serverContent?.outputTranscription?.finished) {
-                  clientWs.send(
-                    JSON.stringify({
-                      transcriptionComplete: true,
-                      isModel: true,
-                    }),
-                  );
-                }
-                if (message.serverContent?.inputTranscription?.text) {
-                  clientWs.send(
-                    JSON.stringify({
-                      text: message.serverContent.inputTranscription.text,
-                      isUserTranscription: true,
-                    }),
-                  );
-                }
-                if (message.serverContent?.inputTranscription?.finished) {
-                  clientWs.send(
-                    JSON.stringify({
-                      transcriptionComplete: true,
-                      isUserTranscription: true,
-                    }),
-                  );
+                // Handle Input Transcription (User voice text)
+                const inputTrans = (serverContent as any).inputAudioTranscription || (serverContent as any).inputTranscription;
+                if (inputTrans?.text) {
+                  clientWs.send(JSON.stringify({
+                    text: inputTrans.text,
+                    isUserTranscription: true,
+                    isFinal: inputTrans.finished || (serverContent as any).turnComplete || false
+                  }));
                 }
 
-                if (message.serverContent?.turnComplete) {
-                  clientWs.send(
-                    JSON.stringify({ turnComplete: true, isModel: true }),
-                  );
+                // Handle Output Transcription (Model voice text - secondary check)
+                const outputTrans = (serverContent as any).outputAudioTranscription || (serverContent as any).outputTranscription;
+                if (outputTrans?.text) {
+                  clientWs.send(JSON.stringify({
+                    text: outputTrans.text,
+                    isModel: true
+                  }));
+                }
+
+                if (serverContent.turnComplete) {
+                  clientWs.send(JSON.stringify({ turnComplete: true, isModel: true }));
                 }
               },
             },
@@ -2009,7 +2036,7 @@ async function startServer() {
       }
 
       if (!session) {
-        throw new Error("All Live API models exhausted due to quota limits.");
+        throw new Error("Live API connection failed. Please check your API key and quotas.");
       }
 
       clientWs.send(JSON.stringify({ connected: true, model: usedModel }));
@@ -2034,13 +2061,13 @@ async function startServer() {
       });
 
       clientWs.on("close", () => {
-        // We can't close the session directly yet in the current version easily, but we can drop the connection
-        // Just let it timeout or find a way
-        // actually there is no session.close() in SDK 0.1? I'll check docs.
-        // The SKILL says "Use session.close() when finished."
         try {
-          // session.close();
-        } catch (e) {}
+          if (session && typeof session.close === "function") {
+            session.close();
+          }
+        } catch (e) {
+          console.error("Error closing Live session:", e);
+        }
       });
     } catch (e: any) {
       console.error("Live API Connection error:", e);

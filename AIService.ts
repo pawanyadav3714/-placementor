@@ -11,14 +11,22 @@ interface UsageData {
 const globalUsage: UsageData = {};
 const memCache: Map<string, { response: string; model: AIProvider }> = new Map();
 
-const geminiAi = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
-  httpOptions: {
-    headers: {
-      'User-Agent': 'aistudio-build',
-    }
+let geminiAiInstance: GoogleGenAI | null = null;
+
+function getGeminiClient(): GoogleGenAI {
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
+  if (!apiKey || apiKey === "MISSING_API_KEY" || apiKey === "") {
+    throw new Error("GEMINI_API_KEY is not configured. Please add your Gemini API key in the Secrets panel (Settings > Secrets).");
   }
-});
+  
+  if (!geminiAiInstance) {
+    geminiAiInstance = new GoogleGenAI({
+      apiKey: apiKey,
+      apiVersion: "v1beta"
+    });
+  }
+  return geminiAiInstance;
+}
 
 const rateLimitedModels = new Map<string, number>();
 
@@ -27,8 +35,10 @@ function getOrderedModels(primaryModel: string): string[] {
     primaryModel,
     "gemini-3.5-flash",
     "gemini-flash-latest",
-    "gemini-3.1-flash-lite",
     "gemini-3.1-pro-preview",
+    "gemini-3.1-flash-lite",
+    "gemini-2.0-flash",
+    "gemini-pro-latest",
   ];
 
   const uniqueModels = Array.from(new Set(allModels));
@@ -703,11 +713,7 @@ Here is a conceptual breakdown to deepen your understanding:
   ): Promise<string | null> {
     switch (provider) {
       case "Gemini":
-        if (
-          !process.env.GEMINI_API_KEY ||
-          process.env.GEMINI_API_KEY === "MISSING_API_KEY"
-        )
-          throw new Error("No GEMINI_API_KEY");
+        const geminiClient = getGeminiClient();
 
         let modelName = "gemini-3.5-flash";
         if (
@@ -734,7 +740,7 @@ Here is a conceptual breakdown to deepen your understanding:
 
         let lastErr: any = null;
         for (const currentModel of candidateModels) {
-          let retries = 2;
+          let retries = 3;
           while (retries > 0) {
             try {
               console.log(
@@ -751,7 +757,7 @@ Here is a conceptual breakdown to deepen your understanding:
                   }
                 : prompt;
 
-              const response = await geminiAi.models.generateContent({
+              const response = await geminiClient.models.generateContent({
                 model: currentModel,
                 contents: contents,
                 config,
@@ -760,9 +766,13 @@ Here is a conceptual breakdown to deepen your understanding:
             } catch (e: any) {
               const errorMsg = e?.message || String(e);
               const status = e?.status || e?.error?.code;
-              const isQuota = status === 429 || errorMsg.includes("quota") || errorMsg.includes("rate limit") || errorMsg.includes("429");
+              const isQuota = status === 429 || errorMsg.includes("quota") || errorMsg.includes("rate limit") || errorMsg.includes("429") || errorMsg.includes("RESOURCE_EXHAUSTED");
+              const isUnavailable = status === 503 || errorMsg.includes("503") || errorMsg.includes("UNAVAILABLE") || errorMsg.includes("overloaded");
+
               if (isQuota) {
                 console.log(`[AIService] Gemini model ${currentModel} rate limit or quota exceeded, trying next model.`);
+              } else if (isUnavailable) {
+                console.warn(`[AIService] Gemini model ${currentModel} temporary unavailable (503), retrying...`);
               } else {
                 console.warn(`[AIService] Gemini model ${currentModel} failed (status: ${status}): ${errorMsg}`);
               }
@@ -770,22 +780,21 @@ Here is a conceptual breakdown to deepen your understanding:
 
               // If rate limited or quota exceeded (429)
               if (isQuota) {
-                rateLimitedModels.set(currentModel, Date.now() + 10 * 60 * 1000); // penalize for 10 minutes
+                rateLimitedModels.set(currentModel, Date.now() + 5 * 60 * 1000); // penalize for 5 minutes
                 break; // instantly try next model
               }
 
               // If 503 temporary unavailable
-              if (
-                status === 503 ||
-                errorMsg.includes("503") ||
-                errorMsg.includes("UNAVAILABLE")
-              ) {
+              if (isUnavailable) {
                 retries--;
                 if (retries > 0) {
-                  console.log(`[AIService] Model ${currentModel} received 503, retrying in 1.5s...`);
-                  await new Promise((resolve) => setTimeout(resolve, 1500));
+                  const delay = (3 - retries) * 1000; // 1s, 2s...
+                  console.log(`[AIService] Model ${currentModel} received 503, retrying in ${delay}ms...`);
+                  await new Promise((resolve) => setTimeout(resolve, delay));
                   continue;
                 }
+                // If all retries failed for this model, penalize it briefly and try next
+                rateLimitedModels.set(currentModel, Date.now() + 30 * 1000); // penalize for 30 seconds
               }
 
               // For other errors, move to next model

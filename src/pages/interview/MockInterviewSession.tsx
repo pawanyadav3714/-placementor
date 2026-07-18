@@ -24,6 +24,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { doc, setDoc, serverTimestamp, getDoc } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 import { useNavigate, useLocation } from "react-router-dom";
+import { safeStringify } from "../../utils/safeStringify";
 
 function pcmToBase64(pcmData: Float32Array) {
   const buffer = new ArrayBuffer(pcmData.length * 2);
@@ -260,17 +261,39 @@ export default function MockInterviewSession() {
       outputAudioCtxRef.current = outputAudioCtx;
 
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true },
+        audio: { 
+          echoCancellation: true, 
+          noiseSuppression: true,
+          autoGainControl: true
+        },
       });
       streamRef.current = stream;
 
       const source = inputAudioCtx.createMediaStreamSource(stream);
-      // createScriptProcessor is deprecated but still widely used for simple PCM extraction in browsers
-      const processor = inputAudioCtx.createScriptProcessor(4096, 1, 1);
+      // Reduced buffer size to 1024 for even lower latency (approx 64ms at 16kHz)
+      const processor = inputAudioCtx.createScriptProcessor(1024, 1, 1);
 
       processor.onaudioprocess = (e) => {
+        const inputData = e.inputBuffer.getChannelData(0);
+
+        // Simple Local Voice Activity Detection for instant interruption feel
+        let sum = 0;
+        for (let i = 0; i < inputData.length; i++) {
+          sum += inputData[i] * inputData[i];
+        }
+        const rms = Math.sqrt(sum / inputData.length);
+        
+        // If user is clearly speaking (RMS > 0.05) and AI is talking, kill AI audio immediately
+        if (rms > 0.05 && activeSourcesRef.current.length > 0) {
+          nextStartTimeRef.current = 0;
+          activeSourcesRef.current.forEach((s) => {
+            try { s.stop(); } catch (err) {}
+          });
+          activeSourcesRef.current = [];
+        }
+
         if (ws.readyState === WebSocket.OPEN) {
-          const base64 = pcmToBase64(e.inputBuffer.getChannelData(0));
+          const base64 = pcmToBase64(inputData);
           ws.send(JSON.stringify({ audio: base64 }));
         }
       };
@@ -292,8 +315,7 @@ export default function MockInterviewSession() {
                   `${m.sender === "user" ? userName : "Interviewer"}: ${m.text}`,
               )
               .join("\n\n");
-            const lastSender = currentLog[currentLog.length - 1].sender;
-
+            
             initialMessage = `We are continuing our previous interview session. Here is what we have discussed so far:\n\n${formattedLog}\n\nPlease resume the conversation seamlessly based on the context above. Do not repeat what was already said. If the last message was from me (${userName}), please respond to it as the Interviewer. If the last message was from the Interviewer, simply acknowledge silently by saying "I'm ready" or waiting for my audio input without asking a new question yet.`;
           } else {
             const personaObj = PERSONAS.find(p => p.id === selectedPersona) || PERSONAS[0];
@@ -329,8 +351,8 @@ Then, wait for my response. Ask one question at a time. After I speak, evaluate 
           playAudioChunk(outputAudioCtxRef.current, msg.audio);
         }
         if (msg.interrupted) {
+          console.log("[Client] Interruption received from server");
           nextStartTimeRef.current = 0;
-          window.speechSynthesis.cancel();
 
           activeSourcesRef.current.forEach((source) => {
             try {
@@ -340,12 +362,14 @@ Then, wait for my response. Ask one question at a time. After I speak, evaluate 
           activeSourcesRef.current = [];
 
           setLiveLog((prev) => {
-            if (prev.length > 0 && prev[prev.length - 1].sender === "ai") {
-              const newLog = [...prev];
-              newLog[newLog.length - 1].complete = true;
-              return newLog;
+            const newLog = [...prev];
+            // Mark the last AI message as complete if it was interrupted
+            const lastAiIdx = newLog.map((l, i) => l.sender === "ai" && !l.complete ? i : -1).filter(i => i !== -1).pop();
+            if (lastAiIdx !== undefined && lastAiIdx !== -1) {
+              newLog[lastAiIdx].complete = true;
+              newLog[lastAiIdx].text += "... [Interrupted]";
             }
-            return prev;
+            return newLog;
           });
         }
         if (msg.text) {
@@ -355,11 +379,17 @@ Then, wait for my response. Ask one question at a time. After I speak, evaluate 
           }
           setLiveLog((prev) => {
             const newLog = [...prev];
-            const last = newLog[newLog.length - 1];
-            if (last && last.sender === senderType && !last.complete) {
-              newLog[newLog.length - 1] = {
+            // Find the last message from this sender that is NOT complete
+            const lastIdx = newLog.map((l, i) => l.sender === senderType && !l.complete ? i : -1).filter(i => i !== -1).pop();
+            
+            if (lastIdx !== undefined && lastIdx !== -1) {
+              const last = newLog[lastIdx];
+              // For user transcription, we often get full updated strings, so we replace instead of append
+              const updatedText = senderType === "user" ? msg.text : last.text + msg.text;
+              newLog[lastIdx] = {
                 ...last,
-                text: last.text + msg.text,
+                text: updatedText,
+                complete: msg.isFinal || false
               };
               return newLog;
             } else {
@@ -370,7 +400,7 @@ Then, wait for my response. Ask one question at a time. After I speak, evaluate 
                   text: msg.text,
                   time: new Date().toLocaleTimeString(),
                   id: Date.now(),
-                  complete: false,
+                  complete: msg.isFinal || false,
                 },
               ];
             }
@@ -379,39 +409,25 @@ Then, wait for my response. Ask one question at a time. After I speak, evaluate 
         if (msg.transcriptionComplete) {
           const senderType = msg.isUserTranscription ? "user" : "ai";
           setLiveLog((prev) => {
-            if (
-              prev.length > 0 &&
-              prev[prev.length - 1].sender === senderType
-            ) {
-              const newLog = [...prev];
-              newLog[newLog.length - 1].complete = true;
+            const newLog = [...prev];
+            const lastIdx = newLog.map((l, i) => l.sender === senderType && !l.complete ? i : -1).filter(i => i !== -1).pop();
+            if (lastIdx !== undefined && lastIdx !== -1) {
+              newLog[lastIdx].complete = true;
               return newLog;
             }
             return prev;
           });
         }
         if (msg.turnComplete) {
-          if (!receivedAudioRef.current && currentAiTextRef.current) {
-            const utterance = new SpeechSynthesisUtterance(
-              currentAiTextRef.current,
-            );
-            const voices = window.speechSynthesis.getVoices();
-            const preferredVoice =
-              voices.find(
-                (v) => v.lang.includes("en") && v.name.includes("Female"),
-              ) || voices[0];
-            if (preferredVoice) utterance.voice = preferredVoice;
-            window.speechSynthesis.speak(utterance);
-          }
           receivedAudioRef.current = false;
           currentAiTextRef.current = "";
           setLiveLog((prev) => {
-            if (prev.length > 0 && prev[prev.length - 1].sender === "ai") {
-              const newLog = [...prev];
-              newLog[newLog.length - 1].complete = true;
-              return newLog;
-            }
-            return prev;
+            const newLog = [...prev];
+            // Mark the last AI and USER messages as complete
+            return newLog.map(log => {
+              if (!log.complete) return { ...log, complete: true };
+              return log;
+            });
           });
         }
       };
@@ -457,7 +473,7 @@ Then, wait for my response. Ask one question at a time. After I speak, evaluate 
       const res = await fetch("/api/evaluate-interview", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: safeStringify({
           question: "Full Live Interview Session",
           answerText: fullTranscript,
           type: "Technical/HR Live Session",

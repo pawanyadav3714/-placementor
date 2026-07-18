@@ -57,6 +57,8 @@ export default function AdminCompanyManagement() {
         } else {
           setExistingQuestions([]);
         }
+      }, (err) => {
+        console.error("Error fetching company dsa questions:", err);
       });
       return () => unsubscribe();
     } else if (activeTab === 'aptitude') {
@@ -65,6 +67,8 @@ export default function AdminCompanyManagement() {
       const unsubscribe = onSnapshot(q, (snap) => {
         const questions = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setExistingQuestions(questions);
+      }, (err) => {
+        console.error("Error fetching technical aptitude questions:", err);
       });
       return () => unsubscribe();
     }

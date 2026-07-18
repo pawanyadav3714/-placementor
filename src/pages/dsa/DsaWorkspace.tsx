@@ -537,6 +537,8 @@ export default function DsaWorkspace({
       setSubmissions(
         snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
       );
+    }, (error) => {
+      console.error("Submissions snapshot error:", error);
     });
     return () => unsubscribe();
   }, [user]);
@@ -648,6 +650,8 @@ export default function DsaWorkspace({
           setPracticeQuestions(merged);
         }
       }
+    }, (err) => {
+      console.error("Error fetching question banks:", err);
     });
     return () => unsubscribe();
   }, [activeBankName]);
@@ -661,6 +665,8 @@ export default function DsaWorkspace({
       });
       tests.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
       setReleasedTests(tests);
+    }, (err) => {
+      console.error("Error fetching released tests:", err);
     });
     return () => unsubscribe();
   }, []);

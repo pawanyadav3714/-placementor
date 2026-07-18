@@ -61,6 +61,8 @@ export default function AdminTestPapers() {
       } else {
         setBankData({});
       }
+    }, (err) => {
+      console.error("Error fetching question banks:", err);
     });
     return () => unsubscribe();
   }, []);
@@ -75,6 +77,8 @@ export default function AdminTestPapers() {
       // Sort by creation desc
       tests.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
       setReleasedTests(tests);
+    }, (err) => {
+      console.error("Error fetching released tests:", err);
     });
     return () => unsubscribe();
   }, []);

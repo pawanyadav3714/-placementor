@@ -248,6 +248,7 @@ export default function StudentDashboard() {
     setIsPerformanceLoading(false);
   }, [problemsSolvedCount, completedTestsCount, bestResumeScore, bestInterviewScore, roadmapProgress]);
   useEffect(() => {
+    if (!user) return;
     // Listen for pending released tests
     const q = query(
       collection(db, "released_tests"),
@@ -273,9 +274,11 @@ export default function StudentDashboard() {
         }
       });
       setPendingTests(tests);
+    }, (error) => {
+      console.error("Released tests snapshot error:", error);
     });
     return () => unsubscribe();
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -479,7 +482,7 @@ export default function StudentDashboard() {
           const res = await fetch("/api/analyze-platform-rank", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
+            body: safeStringify({
               rank: calculatedRank,
               totalStudents: totalStudentsCount,
               tests: completedTestsCount,

@@ -48,6 +48,8 @@ export default function CompanyWorkspace() {
       } else {
         setDsaQuestions([]);
       }
+    }, (err) => {
+      console.error("Error fetching company dsa questions:", err);
     });
 
     // Fetch Aptitude Questions (Company specific + Global)
@@ -60,6 +62,8 @@ export default function CompanyWorkspace() {
         .map(doc => ({ id: doc.id, ...doc.data() as any }))
         .filter(item => item.company?.toLowerCase() === company?.toLowerCase() || item.global === true);
       setAptitudeQuestions(data);
+    }, (err) => {
+      console.error("Error fetching aptitude questions:", err);
     });
 
     if (user) {

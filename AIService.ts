@@ -18,6 +18,10 @@ function getGeminiClient(): GoogleGenAI {
   if (!apiKey || apiKey === "MISSING_API_KEY" || apiKey === "") {
     throw new Error("GEMINI_API_KEY is not configured. Please add your Gemini API key in the Secrets panel (Settings > Secrets).");
   }
+
+  if (apiKey.startsWith("sk-or-")) {
+    throw new Error("You have entered an OpenRouter API key (sk-or-...) into the Gemini API Key field. Please move this key to the OPENROUTER_API_KEY secret and provide a valid Google Gemini API key for the Live Interview feature.");
+  }
   
   if (!geminiAiInstance) {
     geminiAiInstance = new GoogleGenAI({
@@ -38,9 +42,9 @@ const rateLimitedModels = new Map<string, number>();
 function getOrderedModels(primaryModel: string): string[] {
   const allModels = [
     primaryModel,
-    "gemini-3.5-flash",
-    "gemini-3.1-pro-preview",
-    "gemini-3.1-flash-lite",
+    "gemini-1.5-flash",
+    "gemini-1.5-pro",
+    "gemini-2.0-flash-exp",
   ];
 
   const uniqueModels = Array.from(new Set(allModels));
@@ -79,7 +83,8 @@ export type AIFeature =
   | "TestEvaluation"
   | "DSATestCases"
   | "ProblemAssistant"
-  | "RoadmapAssistant";
+  | "RoadmapAssistant"
+  | "VsCodeAssistant";
 
 export interface AIResponse {
   text: string;
@@ -89,10 +94,23 @@ export interface AIResponse {
 
 export class AIService {
   static getHierarchyForFeature(feature: AIFeature): AIProvider[] {
+    const geminiKey = process.env.GEMINI_API_KEY?.trim();
+    const orKey = process.env.OPENROUTER_API_KEY?.trim();
+    
+    let baseHierarchy: AIProvider[] = ["Gemini", "Groq", "OpenRouter", "Cloudflare", "Ollama", "OpenAI"];
+    
     if (feature === "ProblemAssistant") {
-      return ["OpenAI", "Gemini"];
+      baseHierarchy = ["OpenAI", "Gemini", "OpenRouter"];
     }
-    return ["Gemini", "Groq", "OpenRouter", "Cloudflare", "Ollama", "OpenAI"];
+
+    // Smart Swap: If GEMINI_API_KEY is actually an OpenRouter key, and OPENROUTER_API_KEY is empty
+    if (geminiKey?.startsWith("sk-or-") && (!orKey || orKey === "")) {
+      // Move OpenRouter to the front
+      baseHierarchy = baseHierarchy.filter(p => p !== "OpenRouter");
+      baseHierarchy.unshift("OpenRouter");
+    }
+
+    return baseHierarchy;
   }
 
   static async generateWithFallback(
@@ -717,16 +735,16 @@ Here is a conceptual breakdown to deepen your understanding:
       case "Gemini":
         const geminiClient = getGeminiClient();
 
-        let modelName = "gemini-3.5-flash";
+        let modelName = "gemini-1.5-flash";
         if (
           feature === "CodingSolution" ||
           feature === "DSAExplanation" ||
           feature === "ResumeAnalysis" ||
           feature === "InterviewSimulator"
         ) {
-          modelName = "gemini-3.1-pro-preview";
+          modelName = "gemini-1.5-pro";
         } else if (feature === "QuizGeneration") {
-          modelName = "gemini-3.5-flash";
+          modelName = "gemini-1.5-flash";
         }
 
         const config: any = {
@@ -866,8 +884,22 @@ Here is a conceptual breakdown to deepen your understanding:
         return groqData.choices[0]?.message?.content || null;
 
       case "OpenRouter":
-        if (!process.env.OPENROUTER_API_KEY)
-          throw new Error("No OPENROUTER_API_KEY");
+        let apiKey = process.env.OPENROUTER_API_KEY?.trim();
+        
+        // Use Gemini key if it's actually an OpenRouter key
+        const geminiKey = process.env.GEMINI_API_KEY?.trim();
+        if ((!apiKey || apiKey === "") && geminiKey?.startsWith("sk-or-")) {
+          apiKey = geminiKey;
+        }
+
+        if (!apiKey || apiKey === "")
+          throw new Error("No OPENROUTER_API_KEY configured.");
+        
+        let orModel = "google/gemini-2.0-flash-exp"; // Fast default
+        if (feature === "ProblemAssistant" || feature === "InterviewSimulator") {
+          orModel = "deepseek/deepseek-r1"; // High quality reasoning
+        }
+
         const orRes = await fetch(
           "https://openrouter.ai/api/v1/chat/completions",
           {
@@ -879,7 +911,7 @@ Here is a conceptual breakdown to deepen your understanding:
               "X-Title": "Placement Platform",
             },
             body: JSON.stringify({
-              model: "deepseek/deepseek-r1",
+              model: orModel,
               temperature: options?.temperature ?? 0.7,
               top_p: options?.top_p ?? 1.0,
               messages: [{ role: "user", content: prompt }],

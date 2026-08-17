@@ -183,6 +183,13 @@ export default function AppLayout({
             icon: Sparkles,
             value: "interview",
           },
+          {
+            name: "VS Code",
+            shortName: "VS Code",
+            path: "/vscode",
+            icon: Code,
+            value: "vscode",
+          },
         ];
 
   return (

@@ -305,21 +305,30 @@ export default function MockInterviewSession() {
       gainNode.connect(inputAudioCtx.destination);
 
       ws.onopen = () => {
-        const userName = user?.email ? user.email.split("@")[0] : "Candidate";
-        setLiveLog((currentLog) => {
-          let initialMessage = "";
-          if (currentLog.length > 0) {
-            const formattedLog = currentLog
-              .map(
-                (m) =>
-                  `${m.sender === "user" ? userName : "Interviewer"}: ${m.text}`,
-              )
-              .join("\n\n");
-            
-            initialMessage = `We are continuing our previous interview session. Here is what we have discussed so far:\n\n${formattedLog}\n\nPlease resume the conversation seamlessly based on the context above. Do not repeat what was already said. If the last message was from me (${userName}), please respond to it as the Interviewer. If the last message was from the Interviewer, simply acknowledge silently by saying "I'm ready" or waiting for my audio input without asking a new question yet.`;
-          } else {
-            const personaObj = PERSONAS.find(p => p.id === selectedPersona) || PERSONAS[0];
-            initialMessage = `SYSTEM INSTRUCTION / ROLEPLAY CONFIGURATION:
+        console.log("[WebSocket] Connection opened, waiting for session activation...");
+      };
+
+      ws.onmessage = (event) => {
+        const msg = JSON.parse(event.data);
+        if (msg.connected) {
+          setConnectedModel(msg.model);
+          
+          // SEND INITIAL MESSAGE ONLY AFTER CONNECTION IS FULLY ESTABLISHED
+          const userName = user?.email ? user.email.split("@")[0] : "Candidate";
+          setLiveLog((currentLog) => {
+            let initialMessage = "";
+            if (currentLog.length > 0) {
+              const formattedLog = currentLog
+                .map(
+                  (m) =>
+                    `${m.sender === "user" ? userName : "Interviewer"}: ${m.text}`,
+                )
+                .join("\n\n");
+              
+              initialMessage = `We are continuing our previous interview session. Here is what we have discussed so far:\n\n${formattedLog}\n\nPlease resume the conversation seamlessly based on the context above. Do not repeat what was already said. If the last message was from me (${userName}), please respond to it as the Interviewer. If the last message was from the Interviewer, simply acknowledge silently by saying "I'm ready" or waiting for my audio input without asking a new question yet.`;
+            } else {
+              const personaObj = PERSONAS.find(p => p.id === selectedPersona) || PERSONAS[0];
+              initialMessage = `SYSTEM INSTRUCTION / ROLEPLAY CONFIGURATION:
 You are roleplaying as "${personaObj.name}" (${personaObj.title}).
 Style & Demeanor: ${personaObj.description}.
 Candidate Name: ${userName}.
@@ -330,19 +339,15 @@ ${customFocus ? `Custom Interview Focus / Target Job Description: "${customFocus
 Conduct a professional, interactive live mock interview.
 Start the conversation by saying exactly: "Hey ${userName}, can we start the interview?". Do not include any other introductory text, background, or pleasantries.
 Then, wait for my response. Ask one question at a time. After I speak, evaluate my response, provide short context or feedback, and ask the next question. Keep your responses relatively conversational and brief. Let's begin.`;
-          }
-          ws.send(JSON.stringify({ text: initialMessage }));
-          return currentLog;
-        });
-      };
-
-      ws.onmessage = (event) => {
-        const msg = JSON.parse(event.data);
-        if (msg.connected) {
-          setConnectedModel(msg.model);
+            }
+            if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+              wsRef.current.send(JSON.stringify({ text: initialMessage }));
+            }
+            return currentLog;
+          });
         }
         if (msg.error) {
-          alert(msg.message || "An error occurred with the Live API.");
+          alert(typeof msg.error === "string" ? msg.error : (msg.message || "An error occurred with the Live API."));
           stopLiveSession();
           return;
         }

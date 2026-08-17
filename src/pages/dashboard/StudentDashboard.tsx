@@ -13,6 +13,8 @@ import {
   LogOut,
   AlertCircle,
   ArrowRight,
+  WifiOff,
+  RefreshCcw,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -101,41 +103,73 @@ export default function StudentDashboard() {
   };
 
   const [masteryData, setMasteryData] = useState(defaultMastery);
+  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'offline' | 'error'>('connected');
+  const [proxyHint, setProxyHint] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchMastery = async () => {
-      if (!user) return;
+  const fetchMastery = async () => {
+    if (!user) return;
+    try {
+      setConnectionStatus('connected');
+      setProxyHint(null);
+      console.log(`[Dashboard] Fetching mastery for UID: ${user.uid} on Project: ${db.app.options.projectId}`);
+      
+      // ATTEMPT 1: Direct Client Fetch (Fastest)
       try {
-        // Fetch mastery from user's analytics or derive from solved problems
         const docRef = doc(db, "users", user.uid, "analytics", "mastery");
         const docSnap = await getDoc(docRef);
         
         if (docSnap.exists()) {
+          console.log("[Dashboard] Mastery doc found via client");
           setMasteryData(prev => ({ ...prev, ...docSnap.data() }));
-        } else {
-          // If no direct mastery doc, let's look at solved problems to derive some levels
-          const q = query(collection(db, "users", user.uid, "solved_problems"));
-          const snapshot = await getDocs(q);
-          const topicCounts: any = {};
-          snapshot.forEach(doc => {
-            const data = doc.data();
-            const topic = data.topic || "Unknown";
-            topicCounts[topic] = (topicCounts[topic] || 0) + 1;
-          });
-          
-          const newMastery = { ...defaultMastery };
-          Object.keys(topicCounts).forEach(topic => {
-            if (topic in newMastery) {
-              // Simple heuristic: 5 problems = 50% mastery, 10 problems = 90%
-              (newMastery as any)[topic] = Math.min(95, topicCounts[topic] * 10);
-            }
-          });
-          setMasteryData(newMastery);
+          return;
         }
-      } catch (e) {
-        console.error("Error fetching mastery data:", e);
+      } catch (clientErr: any) {
+        console.warn("[Dashboard] Client fetch failed, falling back to proxy...", clientErr.message);
       }
-    };
+
+      // ATTEMPT 2: Server-Side Proxy (Bypasses browser network blocks)
+      try {
+        const response = await fetch(`/api/analytics/mastery/${user.uid}`);
+        const result = await response.json();
+        if (result.success && result.data) {
+          console.log("[Dashboard] Mastery data fetched via proxy");
+          setMasteryData(prev => ({ ...prev, ...result.data }));
+          return;
+        } else if (result.hint) {
+          setProxyHint(result.hint);
+        }
+      } catch (proxyErr: any) {
+        console.warn("[Dashboard] Proxy fetch failed...", proxyErr.message);
+      }
+
+      // ATTEMPT 3: Derive from solved problems if both fetches fail or no doc exists
+      console.log("[Dashboard] Deriving mastery from solved problems...");
+      const q = query(collection(db, "users", user.uid, "solved_problems"));
+      const snapshot = await getDocs(q);
+      const topicCounts: any = {};
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        const topic = data.topic || "Unknown";
+        topicCounts[topic] = (topicCounts[topic] || 0) + 1;
+      });
+      
+      const newMastery = { ...defaultMastery };
+      Object.keys(topicCounts).forEach(topic => {
+        if (topic in newMastery) {
+          // Simple heuristic: 5 problems = 50% mastery, 10 problems = 90%
+          (newMastery as any)[topic] = Math.min(95, topicCounts[topic] * 10);
+        }
+      });
+      setMasteryData(newMastery);
+
+    } catch (e: any) {
+      console.error("Error fetching mastery data:", e);
+      const isOffline = e.code === 'unavailable' || e.message?.includes('offline') || e.code === 'failed-precondition';
+      setConnectionStatus(isOffline ? 'offline' : 'error');
+    }
+  };
+
+  useEffect(() => {
     fetchMastery();
   }, [user]);
 
@@ -645,6 +679,63 @@ export default function StudentDashboard() {
             </AnimatePresence>
           </div>
         </div>
+
+        {connectionStatus !== "connected" && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={`p-5 rounded-2xl border backdrop-blur-md flex items-center justify-between gap-6 shadow-lg ${
+              connectionStatus === "offline"
+                ? "bg-amber-500/5 border-amber-500/20 text-amber-200/90 shadow-amber-500/5"
+                : "bg-red-500/5 border-red-500/20 text-red-200/90 shadow-red-500/5"
+            }`}
+          >
+            <div className="flex items-center gap-4">
+              <div className={`p-2.5 rounded-xl ${
+                connectionStatus === "offline" ? "bg-amber-500/10" : "bg-red-500/10"
+              }`}>
+                {connectionStatus === "offline" ? (
+                  <WifiOff className="w-5 h-5 flex-shrink-0" />
+                ) : (
+                  <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                )}
+              </div>
+              <div>
+                <p className="text-sm font-semibold tracking-tight">
+                  {connectionStatus === "offline"
+                    ? "Connection Interrupted"
+                    : "Data Synchronization Failed"}
+                </p>
+                <p className="text-xs opacity-70 mt-1 leading-relaxed max-w-md">
+                  {proxyHint || (connectionStatus === "offline"
+                    ? "We're having trouble reaching the database. Please verify your connection or database setup."
+                    : "An error occurred while fetching your progress data from the server.")
+                  }
+                </p>
+                {proxyHint && (
+                  <a 
+                    href="https://console.firebase.google.com/project/juniors-resources/firestore"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 mt-3 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-full text-[11px] font-medium transition-all"
+                  >
+                    Open Firebase Console
+                    <ArrowRight className="w-3 h-3" />
+                  </a>
+                )}
+              </div>
+            </div>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => fetchMastery()}
+                className="flex items-center gap-2 px-5 py-2 rounded-full bg-white/10 hover:bg-white/20 border border-white/10 transition-all text-xs font-semibold whitespace-nowrap active:scale-95"
+              >
+                <RefreshCcw className="w-3.5 h-3.5" />
+                Retry Sync
+              </button>
+            </div>
+          </motion.div>
+        )}
 
         {/* Test Alert Priority View */}
         {pendingTests.length > 0 && (

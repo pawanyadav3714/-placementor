@@ -1,31 +1,6 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Auth Helpers
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-
-    // Allow everything for users for debugging
-    match /users/{userId} {
-      allow read, write: if true;
-      
-      match /{allSubcollections=**} {
-        allow read, write: if true;
-      }
-    }
-
-    // Allow everything for released_tests
-    match /released_tests/{document=**} {
-      allow read, write: if true;
-    }
-
-    // Allow everything else for signed in users
     match /{document=**} {
       allow read, write: if true;
     }

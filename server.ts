@@ -6,7 +6,23 @@ import { WebSocketServer } from "ws";
 import dotenv from "dotenv";
 import { AIService } from "./AIService";
 import crypto from "crypto";
+import admin from "firebase-admin";
+import { getFirestore as getAdminFirestore } from "firebase-admin/firestore";
+const { initializeApp: initializeAdminApp, getApps: getAdminApps } = admin;
+
 dotenv.config();
+
+// Initialize Firebase Admin if not already initialized
+if (getAdminApps().length === 0) {
+  try {
+    initializeAdminApp({
+      projectId: "juniors-resources",
+    });
+    console.log("[Firebase Admin] Initialized for project: juniors-resources");
+  } catch (error) {
+    console.error("[Firebase Admin] Initialization failed:", error);
+  }
+}
 
 const app = express();
 const PORT = 3000;
@@ -27,8 +43,14 @@ function getAI(): GoogleGenAI {
   if (!apiKey || apiKey === "MISSING_API_KEY" || apiKey === "") {
     throw new Error("GEMINI_API_KEY is not configured. Please add your Gemini API key in the Secrets panel (Settings > Secrets).");
   }
+
+  if (apiKey.startsWith("sk-or-")) {
+    throw new Error("You have entered an OpenRouter API key (sk-or-...) into the Gemini API Key field. Please move this key to the OPENROUTER_API_KEY secret and provide a valid Google Gemini API key for the Live Interview feature.");
+  }
   
   if (!aiClient) {
+    const maskedKey = apiKey.substring(0, 4) + "..." + apiKey.substring(apiKey.length - 4);
+    console.log(`[Gemini] Initializing AI Client with key: ${maskedKey}`);
     aiClient = new GoogleGenAI({
       apiKey: apiKey,
       apiVersion: "v1beta",
@@ -47,9 +69,9 @@ const rateLimitedModels = new Map<string, number>();
 function getOrderedModels(primaryModel: string): string[] {
   const allModels = [
     primaryModel,
-    "gemini-3.5-flash",
-    "gemini-3.1-pro-preview",
-    "gemini-3.1-flash-lite",
+    "gemini-1.5-flash",
+    "gemini-1.5-pro",
+    "gemini-2.0-flash-exp",
   ];
 
   const uniqueModels = Array.from(new Set(allModels));
@@ -74,7 +96,7 @@ async function generateWithModelFallback(options: {
   config: any;
   primaryModel?: string;
 }) {
-  const primary = options.primaryModel || "gemini-3.5-flash";
+  const primary = options.primaryModel || "gemini-1.5-flash";
   const orderedModels = getOrderedModels(primary);
 
   let lastError: any = null;
@@ -135,6 +157,37 @@ async function generateWithModelFallback(options: {
   }
   throw lastError;
 }
+
+// Firestore Server-Side Proxy (using Admin SDK with fallback to Client SDK)
+app.get("/api/analytics/mastery/:uid", async (req, res) => {
+  try {
+    const { uid } = req.params;
+    console.log(`[Proxy] Fetching mastery for UID: ${uid}`);
+    
+    // Method 1: Admin SDK (Bypasses security rules)
+    try {
+      const db = getAdminFirestore();
+      const docRef = db.doc(`users/${uid}/analytics/mastery`);
+      const docSnap = await docRef.get();
+      
+      if (docSnap.exists) {
+        return res.json({ success: true, data: docSnap.data(), source: 'admin' });
+      }
+    } catch (adminError: any) {
+      console.warn("[Proxy] Admin SDK fetch failed, trying secondary fallback...", adminError.message);
+    }
+
+    // Method 2: If admin fails or document not found, try to report a specific state
+    res.json({ 
+      success: false, 
+      error: "Data inaccessible. Please ensure you have created the Firestore database in your Firebase Console for project 'juniors-resources'.",
+      hint: "Go to https://console.firebase.google.com/project/juniors-resources/firestore and click 'Create database'."
+    });
+  } catch (error: any) {
+    console.error("[Proxy] Critical Firestore Proxy Error:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
 
 app.get("/api/ai-quotas", async (req, res) => {
   try {
@@ -1496,6 +1549,215 @@ Produce a JSON array of questions matching the required schema. Ensure the compa
   },
 );
 
+// API Route: VS Code Generate Solution
+app.post("/api/vscode/generate-solution", async (req, res) => {
+  try {
+    const { question, language } = req.body;
+    if (!question || !language) {
+      return res.status(400).json({ error: "Question and language are required" });
+    }
+
+    const prompt = `You are a professional coding expert and interviewer.
+Generate a complete solution for the following coding question in ${language}.
+
+Question: ${question}
+
+Return the response strictly in JSON format with the following keys:
+- explanation: A clear and concise explanation of the problem.
+- algorithm: A step-by-step breakdown of the approach used.
+- code: The actual source code in ${language}.
+- complexity: Time and Space complexity analysis.
+- sampleInput: A sample input for the problem.
+- sampleOutput: The corresponding sample output.
+- edgeCases: A list of edge cases and how to handle them.
+
+Do not include any markdown formatting like \`\`\`json.`;
+
+    const aiResponse = await AIService.generateWithFallback("VsCodeAssistant", prompt);
+    let text = aiResponse.text;
+    
+    // Clean up response
+    if (text.startsWith("```json")) {
+      text = text.replace(/```json/g, "").replace(/```/g, "");
+    } else if (text.startsWith("```")) {
+      text = text.replace(/```/g, "");
+    }
+
+    const solution = JSON.parse(text.trim());
+    res.json(solution);
+  } catch (error: any) {
+    console.error("Error generating solution:", error);
+    res.status(500).json({ error: "Failed to generate solution" });
+  }
+});
+
+// API Route: VS Code Execute Code (Proxy to Piston)
+app.post("/api/vscode/execute", async (req, res) => {
+  try {
+    const { language, code, input } = req.body;
+    if (!language || !code) {
+      return res.status(400).json({ error: "Language and code are required" });
+    }
+
+    const pistonLangMap: Record<string, string> = {
+      c: "c",
+      cpp: "cpp",
+      java: "java",
+      python: "python3",
+      javascript: "javascript",
+      typescript: "typescript",
+      go: "go",
+      rust: "rust",
+    };
+
+    const pistonLang = pistonLangMap[language] || language;
+    console.log(`[Piston] Executing ${language} (${pistonLang}) code...`);
+
+    const response = await fetch("https://emkc.org/api/v2/piston/execute", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        language: pistonLang,
+        version: "*",
+        files: [{ content: code }],
+        stdin: input || "",
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("[Piston] API Error:", response.status, errorText);
+      return res.status(response.status).json({ error: "Execution engine error", details: errorText });
+    }
+
+    const result = await response.json();
+    console.log("[Piston] Execution successful");
+    res.json(result);
+  } catch (error: any) {
+    console.error("Error executing code:", error);
+    res.status(500).json({ error: "Failed to execute code", details: error.message });
+  }
+});
+
+// API Route: VS Code AI Action (Explain, Optimize, etc.)
+app.post("/api/vscode/ai-action", async (req, res) => {
+  try {
+    const { action, code, language, context } = req.body;
+    if (!action || !code || !language) {
+      return res.status(400).json({ error: "Action, code, and language are required" });
+    }
+
+    let prompt = "";
+    if (action.startsWith("chat-")) {
+      const userMessage = action.replace("chat-", "");
+      prompt = `You are a helpful coding assistant in a VS Code-like environment. 
+      The student is writing ${language} code.
+      
+      Current Code:
+      ${code}
+      
+      Student says: ${userMessage}
+      
+      Provide a helpful, clear response. If they ask to optimize or fix, provide the code too.`;
+    } else {
+      switch (action) {
+        case "explain":
+          prompt = `Explain the following ${language} code in detail:\n\n${code}`;
+          break;
+        case "optimize":
+          prompt = `Optimize the following ${language} code for better performance and readability. Provide only the optimized code and a brief explanation:\n\n${code}`;
+          break;
+        case "find-bugs":
+          prompt = `Identify any potential bugs or logical errors in the following ${language} code:\n\n${code}`;
+          break;
+        case "fix-errors":
+          prompt = `Fix the errors in the following ${language} code and provide the corrected version:\n\n${code}`;
+          break;
+        case "generate-comments":
+          prompt = `Add meaningful comments to the following ${language} code to improve its documentation:\n\n${code}`;
+          break;
+        case "convert-language":
+          prompt = `Convert the following ${language} code into ${context || "another language"}:\n\n${code}`;
+          break;
+        case "dry-run":
+          prompt = `Perform a dry run of the following ${language} code with sample values and show the step-by-step execution:\n\n${code}`;
+          break;
+        default:
+          prompt = `Analyze the following ${language} code and provide feedback based on ${action}:\n\n${code}`;
+      }
+    }
+
+    const aiResponse = await AIService.generateWithFallback("VsCodeAssistant", prompt);
+    res.json({ response: aiResponse.text });
+  } catch (error: any) {
+    console.error("Error performing AI action:", error);
+    res.status(500).json({ error: "Failed to perform AI action", details: error.message });
+  }
+});
+
+// API Route: VS Code Analyze Error for Voice
+app.post("/api/vscode/analyze-error", async (req, res) => {
+  try {
+    const { code, language, error } = req.body;
+    if (!code || !language || !error) {
+      return res.status(400).json({ error: "Code, language, and error are required" });
+    }
+
+    console.log(`[AI] Analyzing error for ${language} code...`);
+
+    const prompt = `You are a friendly coding mentor. The student is writing ${language} code and encountered an error.
+    
+    Code:
+    ${code}
+    
+    Error Message:
+    ${error}
+    
+    Provide a VERY CONCISE, helpful explanation of the mistake (like a missing declaration, semicolon, or logic error). 
+    Explain it in a way that is easy to understand when spoken aloud. 
+    Keep it friendly and encouraging.
+    Do not use complex formatting, markdown, or symbols. Keep it under 60 words.
+    Specifically point out which line or part of the code is causing the issue and how to fix it.`;
+
+    const aiResponse = await AIService.generateWithFallback("VsCodeAssistant", prompt);
+    console.log("[AI] Error analysis complete");
+    res.json({ analysis: aiResponse.text });
+  } catch (err: any) {
+    console.error("Error analyzing error:", err);
+    res.status(500).json({ error: "Failed to analyze error", details: err.message });
+  }
+});
+
+// API Route: VS Code AI Prediction
+app.post("/api/vscode/predict-output", async (req, res) => {
+  try {
+    const { code, language, input } = req.body;
+    
+    const prompt = `Act as a highly accurate code execution engine. 
+    Predict the exact output of the following ${language} code.
+    If the code requires input, use this input: "${input || ""}".
+    
+    Code:
+    ${code}
+    
+    IMPORTANT: Provide ONLY the terminal output as it would appear in a real console. 
+    Do not include any explanations, markdown code blocks, or preamble. 
+    If there is a compilation error or runtime crash, provide the error message as it would appear in the terminal.
+    If the code produces no output, return exactly "No output generated."`;
+
+    console.log(`[AI] Predicting output for ${language} code via AIService...`);
+    const aiResponse = await AIService.generateWithFallback("VsCodeAssistant", prompt, "anonymous", {
+      temperature: 0.1
+    });
+
+    const output = aiResponse.text.trim() || "No output generated.";
+    res.json({ output, provider: aiResponse.providerUsed });
+  } catch (err: any) {
+    console.error("Error in AI prediction:", err);
+    res.status(500).json({ error: "Failed to predict output", details: err.message });
+  }
+});
+
 // API Route: Generate Technical Aptitude MCQs
 app.post("/api/admin/generate-aptitude-questions", async (req, res) => {
   try {
@@ -1969,7 +2231,12 @@ async function startServer() {
   wss.on("connection", async (clientWs) => {
     console.log("[WebSocket] Client connected to live-interview");
     try {
-      const liveModels = ["gemini-3.1-flash-live-preview"];
+      const liveModels = [
+        "gemini-2.0-flash",
+        "gemini-2.0-flash-lite-preview-02-05",
+        "gemini-2.0-flash-exp",
+        "gemini-2.0-pro-exp-02-05"
+      ];
       let session: any;
       let usedModel = "";
 
@@ -1981,8 +2248,10 @@ async function startServer() {
         return;
       }
 
+      console.log(`[Live API] Client attempting connection. API Key prefix: ${apiKey.substring(0, 7)}...`);
       for (const model of liveModels) {
         try {
+          console.log(`[Live API] Attempting to connect with model: ${model}...`);
           session = await getAI().live.connect({
             model: model,
             config: {

@@ -18,6 +18,7 @@ interface AuthContextType {
   user: User | null;
   profile: UserProfile | null;
   loading: boolean;
+  error: string | null;
   signInWithGoogle: () => Promise<void>;
   signInWithGithub: () => Promise<void>;
   logout: () => Promise<void>;
@@ -29,15 +30,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let unsubscribeProfile: (() => void) | undefined;
     
     const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser);
+      setError(null);
       if (firebaseUser) {
+        console.log("AuthContext: Fetching profile for UID:", firebaseUser.uid);
+        
         // fetch profile
         unsubscribeProfile = onSnapshot(doc(db, 'users', firebaseUser.uid), async (docSnap) => {
+          console.log("AuthContext: Profile snapshot received. Exists:", docSnap.exists());
           if (docSnap.exists()) {
             const data = docSnap.data() as UserProfile;
             
@@ -58,8 +64,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           }
           setLoading(false);
         }, (err) => {
-          console.error("AuthContext: Profile snapshot error", err);
-          setLoading(false);
+          console.error("AuthContext: Profile snapshot error", err.message, err.code, err);
+          if (err.code === 'permission-denied') {
+            setError("Firestore permissions denied. Please ensure you have enabled the Cloud Firestore API and deployed rules.");
+          }
+          
+          // Try a manual getDoc as a one-time fallback to see if it's an onSnapshot issue
+          getDoc(doc(db, 'users', firebaseUser.uid)).then((snap) => {
+             console.log("AuthContext: Fallback getDoc result exists:", snap.exists());
+             if (snap.exists()) {
+               setProfile(snap.data() as UserProfile);
+             }
+             setLoading(false);
+          }).catch(getErr => {
+             console.error("AuthContext: Fallback getDoc also failed", getErr.message);
+             setLoading(false);
+          });
         });
       } else {
         if (unsubscribeProfile) unsubscribeProfile();
@@ -111,7 +131,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signInWithGoogle, signInWithGithub, logout }}>
+    <AuthContext.Provider value={{ user, profile, loading, error, signInWithGoogle, signInWithGithub, logout }}>
       {children}
     </AuthContext.Provider>
   );

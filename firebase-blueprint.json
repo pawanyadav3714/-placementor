@@ -40,6 +40,33 @@
         "percentage": { "type": "number" }
       },
       "required": ["userId", "date", "score"]
+    },
+    "VsCodeQuestion": {
+      "title": "VS Code Question",
+      "description": "A saved coding question and its solution in the VS Code workspace",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "question": { "type": "string" },
+        "language": { "type": "string" },
+        "difficulty": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "code": { "type": "string" },
+        "solution": {
+          "type": "object",
+          "properties": {
+            "explanation": { "type": "string" },
+            "algorithm": { "type": "string" },
+            "code": { "type": "string" },
+            "complexity": { "type": "string" },
+            "sampleInput": { "type": "string" },
+            "sampleOutput": { "type": "string" },
+            "edgeCases": { "type": "string" }
+          }
+        }
+      },
+      "required": ["userId", "title", "question", "language", "createdAt"]
     }
   },
   "firestore": {
@@ -58,6 +85,10 @@
     "/aptitude_attempts/{attemptId}": {
       "schema": { "$ref": "#/entities/AptitudeAttempt" },
       "description": "Student aptitude quiz attempts"
+    },
+    "/vscode_questions/{questionId}": {
+      "schema": { "$ref": "#/entities/VsCodeQuestion" },
+      "description": "Saved coding questions for VS Code workspace"
     }
   }
 }

@@ -220,22 +220,34 @@ export default function AppLayout({
           </button>
         </div>
         <nav className="flex-1 px-4 space-y-2 overflow-y-auto">
-          {navItems.map((item: any) => (
+          {navItems.map((item: any, index: number) => (
             <Link
               key={item.value}
               to={item.path}
               title={isCollapsed ? item.name : undefined}
               className={clsx(
-                "relative flex items-center gap-3 py-3 rounded-xl transition-all duration-200",
+                "relative flex items-center gap-3 py-3 rounded-xl transition-all duration-200 group",
                 activeTab === item.value
                   ? "bg-indigo-500/20 text-indigo-400 font-medium"
                   : "text-gray-400 hover:text-white hover:bg-white/5",
                 isCollapsed ? "justify-center px-0" : "px-4",
+                // Special styling for AI Interview link (7th item)
+                index === 6 && activeTab !== item.value && "bg-gradient-to-r from-indigo-500/5 to-purple-500/5 border border-indigo-500/10 shadow-[0_0_15px_rgba(99,102,241,0.05)]"
               )}
             >
-              <item.icon className="w-5 h-5 flex-shrink-0" />
+              <item.icon className={clsx(
+                "w-5 h-5 flex-shrink-0 transition-transform duration-200 group-hover:scale-110",
+                index === 6 && "text-indigo-400"
+              )} />
               {!isCollapsed && (
-                <span className="truncate flex-1">{item.name}</span>
+                <span className="truncate flex-1 flex items-center justify-between">
+                  {item.name}
+                  {index === 6 && (
+                    <span className="text-[10px] font-bold tracking-wider uppercase bg-indigo-500/20 text-indigo-300 px-1.5 py-0.5 rounded-full border border-indigo-500/30">
+                      Pro
+                    </span>
+                  )}
+                </span>
               )}
 
               {item.alertState && item.alertState !== "none" && (

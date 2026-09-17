@@ -1,9 +1,10 @@
 {
-  "apiKey": "AIzaSyDxR21QpIqMinmjfscRzBHN3Px6zEo_vDM",
-  "authDomain": "juniors-resources.firebaseapp.com",
-  "projectId": "juniors-resources",
-  "storageBucket": "juniors-resources.firebasestorage.app",
-  "messagingSenderId": "703186613210",
-  "appId": "1:703186613210:web:11812732439233a8e406e3",
-  "measurementId": "G-B0ZXXVXQH4"
+  "apiKey": "AIzaSyDQRXHvzRSNJJE9EYyjmYPcr9Kog2cUjjQ",
+  "authDomain": "placementorai-dc6dd.firebaseapp.com",
+  "databaseURL": "https://placementorai-dc6dd-default-rtdb.firebaseio.com",
+  "projectId": "placementorai-dc6dd",
+  "storageBucket": "placementorai-dc6dd.firebasestorage.app",
+  "messagingSenderId": "713735987048",
+  "appId": "1:713735987048:web:81650001f517cefbb5c0dd",
+  "measurementId": "G-Y5L4SS3XVE"
 }

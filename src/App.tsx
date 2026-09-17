@@ -34,7 +34,7 @@ const PrivateRoute = ({ children, roles }: { children: ReactNode, roles?: string
   const isDemoAdmin = localStorage.getItem('demo_admin_bypass') === 'true';
   const isGoingToAdmin = roles?.includes('admin');
   
-  if (error && !isDemoAdmin) {
+  if (error && !isDemoAdmin && !profile && !user) {
     return (
       <div className="h-screen flex items-center justify-center bg-[#0B0F1A] text-white p-6">
         <div className="max-w-md w-full bg-[#151921] border border-red-500/30 rounded-2xl p-8 text-center">
@@ -43,16 +43,16 @@ const PrivateRoute = ({ children, roles }: { children: ReactNode, roles?: string
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
           </div>
-          <h2 className="text-xl font-bold mb-4">Connection Blocked</h2>
+          <h2 className="text-xl font-bold mb-4">Connection Notice</h2>
           <p className="text-gray-400 mb-6">{error}</p>
           <div className="space-y-3">
             <a 
-              href="https://console.developers.google.com/apis/api/firestore.googleapis.com/overview?project=juniors-resources"
+              href="https://console.firebase.google.com/project/placementorai-dc6dd/firestore"
               target="_blank" 
               rel="noopener noreferrer"
               className="block w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 rounded-xl font-medium transition-colors"
             >
-              Enable Firestore API
+              Configure Firestore in Firebase Console
             </a>
             <button 
               onClick={() => window.location.reload()}

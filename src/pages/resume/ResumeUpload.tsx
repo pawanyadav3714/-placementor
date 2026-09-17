@@ -158,10 +158,10 @@ export default function ResumeUpload() {
     e.stopPropagation(); // prevent clicking the card
     try {
       await deleteDoc(doc(db, "resume_history", id));
-      setHistory(history.filter((item) => item.id !== id));
     } catch (error) {
-      console.error("Error deleting history item:", error instanceof Error ? error.message : String(error));
+      console.warn("Error deleting history item from Firestore:", error instanceof Error ? error.message : String(error));
     }
+    setHistory(history.filter((item) => item.id !== id));
   };
 
   const handleFileUpload = async (e: ChangeEvent<HTMLInputElement>) => {

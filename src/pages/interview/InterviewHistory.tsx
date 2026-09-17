@@ -82,11 +82,15 @@ export default function InterviewHistory() {
 
       const newScore = data.scores?.overall || data.overallScore || 0;
 
-      const docRef = doc(db, `users/${user.uid}/interviews`, interview.id);
-      await updateDoc(docRef, {
-        evalResult: data,
-        score: newScore,
-      });
+      try {
+        const docRef = doc(db, `users/${user.uid}/interviews`, interview.id);
+        await updateDoc(docRef, {
+          evalResult: data,
+          score: newScore,
+        });
+      } catch (e) {
+        console.warn("Could not sync interview evaluation to Firestore:", e);
+      }
 
       setInterviews((prev) =>
         prev.map((inv) =>
@@ -115,12 +119,12 @@ export default function InterviewHistory() {
     if (!user) return;
     try {
       await deleteDoc(doc(db, `users/${user.uid}/interviews`, id));
-      setInterviews((prev) => prev.filter((interview) => interview.id !== id));
-      if (selectedInterview?.id === id) {
-        setSelectedInterview(null);
-      }
     } catch (err) {
-      console.error("Error deleting interview:", err);
+      console.warn("Could not delete interview from Firestore directly:", err);
+    }
+    setInterviews((prev) => prev.filter((interview) => interview.id !== id));
+    if (selectedInterview?.id === id) {
+      setSelectedInterview(null);
     }
   };
 

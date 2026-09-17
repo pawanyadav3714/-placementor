@@ -26,7 +26,7 @@ function getGeminiClient(): GoogleGenAI {
   if (!geminiAiInstance) {
     geminiAiInstance = new GoogleGenAI({
       apiKey: apiKey,
-      apiVersion: "v1beta",
+      apiVersion: "v1",
       httpOptions: {
         headers: {
           "User-Agent": "aistudio-build",
@@ -38,14 +38,23 @@ function getGeminiClient(): GoogleGenAI {
 }
 
 const rateLimitedModels = new Map<string, number>();
+let openRouterOutOfCredits = false;
 
 function getOrderedModels(primaryModel: string): string[] {
   const allModels = [
     primaryModel,
-    "gemini-1.5-flash",
-    "gemini-1.5-pro",
-    "gemini-2.0-flash-exp",
-  ];
+    "gemini-3.8-flash",
+    "gemini-3.5-flash",
+    "gemini-flash-latest",
+    "gemini-3.1-flash-lite",
+    "gemini-3.1-pro-preview",
+  ].filter(
+    (m) =>
+      Boolean(m) &&
+      !m.includes("1.5") &&
+      !m.includes("2.0-flash-exp") &&
+      !m.includes("2.5-flash"),
+  );
 
   const uniqueModels = Array.from(new Set(allModels));
   const now = Date.now();
@@ -96,21 +105,40 @@ export class AIService {
   static getHierarchyForFeature(feature: AIFeature): AIProvider[] {
     const geminiKey = process.env.GEMINI_API_KEY?.trim();
     const orKey = process.env.OPENROUTER_API_KEY?.trim();
-    
-    let baseHierarchy: AIProvider[] = ["Gemini", "Groq", "OpenRouter", "Cloudflare", "Ollama", "OpenAI"];
-    
-    if (feature === "ProblemAssistant") {
-      baseHierarchy = ["OpenAI", "Gemini", "OpenRouter"];
+    const groqKey = process.env.GROQ_API_KEY?.trim();
+    const openAIKey = process.env.OPENAI_API_KEY?.trim();
+    const cfKey = process.env.CLOUDFLARE_API_KEY?.trim();
+
+    const availableProviders: AIProvider[] = [];
+
+    // Prioritize Gemini if key exists
+    if (geminiKey && !geminiKey.startsWith("sk-or-")) {
+      availableProviders.push("Gemini");
     }
 
-    // Smart Swap: If GEMINI_API_KEY is actually an OpenRouter key, and OPENROUTER_API_KEY is empty
-    if (geminiKey?.startsWith("sk-or-") && (!orKey || orKey === "")) {
-      // Move OpenRouter to the front
-      baseHierarchy = baseHierarchy.filter(p => p !== "OpenRouter");
-      baseHierarchy.unshift("OpenRouter");
+    // Groq high-speed provider
+    if (groqKey) {
+      availableProviders.push("Groq");
     }
 
-    return baseHierarchy;
+    if (openAIKey) {
+      availableProviders.push("OpenAI");
+    }
+
+    // OpenRouter if configured and not out of credits
+    if ((geminiKey?.startsWith("sk-or-") || orKey) && !openRouterOutOfCredits) {
+      availableProviders.push("OpenRouter");
+    }
+
+    if (cfKey && process.env.CLOUDFLARE_ACCOUNT_ID) {
+      availableProviders.push("Cloudflare");
+    }
+
+    if (feature === "ProblemAssistant" && openAIKey) {
+      return ["OpenAI", ...availableProviders.filter((p) => p !== "OpenAI")];
+    }
+
+    return availableProviders.length > 0 ? availableProviders : ["Gemini"];
   }
 
   static async generateWithFallback(
@@ -735,16 +763,16 @@ Here is a conceptual breakdown to deepen your understanding:
       case "Gemini":
         const geminiClient = getGeminiClient();
 
-        let modelName = "gemini-1.5-flash";
+        let modelName = "gemini-3.8-flash";
         if (
           feature === "CodingSolution" ||
           feature === "DSAExplanation" ||
           feature === "ResumeAnalysis" ||
           feature === "InterviewSimulator"
         ) {
-          modelName = "gemini-1.5-pro";
+          modelName = "gemini-3.8-flash";
         } else if (feature === "QuizGeneration") {
-          modelName = "gemini-1.5-flash";
+          modelName = "gemini-3.8-flash";
         }
 
         const config: any = {
@@ -769,18 +797,16 @@ Here is a conceptual breakdown to deepen your understanding:
               
               (this as any)._lastGeminiModelUsed = currentModel;
               const contents: any = options?.image
-                ? {
-                    parts: [
-                      { text: prompt },
-                      { inlineData: options.image }
-                    ]
-                  }
-                : prompt;
+                ? [
+                    { text: prompt },
+                    { inlineData: options.image }
+                  ]
+                : [{ text: prompt }];
 
               const response = await geminiClient.models.generateContent({
                 model: currentModel,
                 contents: contents,
-                config,
+                config: config,
               });
               return response.text || null;
             } catch (e: any) {
@@ -793,15 +819,24 @@ Here is a conceptual breakdown to deepen your understanding:
 
               const isQuota = status === 429 || errorMsg.includes("quota") || errorMsg.includes("rate limit") || errorMsg.includes("429") || errorMsg.includes("RESOURCE_EXHAUSTED");
               const isUnavailable = status === 503 || errorMsg.includes("503") || errorMsg.includes("UNAVAILABLE") || errorMsg.includes("overloaded");
+              const isNotFound = status === 404 || errorMsg.includes("not found") || errorMsg.includes("not supported");
 
               if (isQuota) {
                 console.log(`[AIService] Gemini model ${currentModel} rate limit or quota exceeded, trying next model.`);
               } else if (isUnavailable) {
                 console.warn(`[AIService] Gemini model ${currentModel} temporary unavailable (503), retrying...`);
+              } else if (isNotFound) {
+                console.log(`[AIService] Gemini model ${currentModel} is not supported or deprecated, skipping.`);
               } else {
                 console.warn(`[AIService] Gemini model ${currentModel} failed (status: ${status}): ${errorMsg}`);
               }
               lastErr = e;
+
+              // If model is deprecated or not found, penalize permanently
+              if (isNotFound) {
+                rateLimitedModels.set(currentModel, Date.now() + 24 * 60 * 60 * 1000);
+                break;
+              }
 
               // If rate limited or quota exceeded (429)
               if (isQuota) {
@@ -858,30 +893,44 @@ Here is a conceptual breakdown to deepen your understanding:
 
       case "Groq":
         if (!process.env.GROQ_API_KEY) throw new Error("No GROQ_API_KEY");
-        const groqRes = await fetch(
-          "https://api.groq.com/openai/v1/chat/completions",
-          {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              model: "llama-3.3-70b-versatile",
-              temperature: options?.temperature ?? 0.7,
-              top_p: options?.top_p ?? 1.0,
-              messages: [{ role: "user", content: prompt }],
-            }),
-          },
-        );
-        if (!groqRes.ok) {
-          const text = await groqRes.text();
-          throw new Error(
-            `Groq HTTP error! status: ${groqRes.status} response: ${text.substring(0, 100)}`,
-          );
+        const groqModels = [
+          "qwen/qwen3.8-27b",
+          "groq/compound-mini",
+          "openai/gpt-oss-120b",
+        ];
+        let groqErr: any = null;
+        for (const currentGroqModel of groqModels) {
+          try {
+            const groqRes = await fetch(
+              "https://api.groq.com/openai/v1/chat/completions",
+              {
+                method: "POST",
+                headers: {
+                  Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  model: currentGroqModel,
+                  temperature: options?.temperature ?? 0.7,
+                  top_p: options?.top_p ?? 1.0,
+                  messages: [{ role: "user", content: prompt }],
+                }),
+              },
+            );
+            if (!groqRes.ok) {
+              const text = await groqRes.text();
+              throw new Error(
+                `Groq HTTP error! status: ${groqRes.status} response: ${text.substring(0, 100)}`,
+              );
+            }
+            const groqData = await groqRes.json();
+            return groqData.choices[0]?.message?.content || null;
+          } catch (err: any) {
+            groqErr = err;
+            continue;
+          }
         }
-        const groqData = await groqRes.json();
-        return groqData.choices[0]?.message?.content || null;
+        throw groqErr || new Error("All Groq models failed");
 
       case "OpenRouter":
         let apiKey = process.env.OPENROUTER_API_KEY?.trim();
@@ -895,9 +944,9 @@ Here is a conceptual breakdown to deepen your understanding:
         if (!apiKey || apiKey === "")
           throw new Error("No OPENROUTER_API_KEY configured.");
         
-        let orModel = "google/gemini-2.0-flash-exp"; // Fast default
+        let orModel = "deepseek/deepseek-chat";
         if (feature === "ProblemAssistant" || feature === "InterviewSimulator") {
-          orModel = "deepseek/deepseek-r1"; // High quality reasoning
+          orModel = "deepseek/deepseek-r1";
         }
 
         const orRes = await fetch(
@@ -905,7 +954,7 @@ Here is a conceptual breakdown to deepen your understanding:
           {
             method: "POST",
             headers: {
-              Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+              Authorization: `Bearer ${apiKey}`,
               "Content-Type": "application/json",
               "HTTP-Referer": process.env.APP_URL || "http://localhost:3000",
               "X-Title": "Placement Platform",
@@ -920,6 +969,9 @@ Here is a conceptual breakdown to deepen your understanding:
         );
         if (!orRes.ok) {
           const text = await orRes.text();
+          if (orRes.status === 402) {
+            openRouterOutOfCredits = true;
+          }
           throw new Error(
             `OpenRouter HTTP error! status: ${orRes.status} response: ${text.substring(0, 100)}`,
           );
